@@ -8,8 +8,12 @@ Route::get('/login', function () {
     return view('login');
 })->name('login');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
-});
+Route::get('/rdashboard', function () {
+    return view('rdashboard');
+})->name('rdashboard');
+
+// Route::middleware(['auth', 'verified'])->group(function () {
+   // Route::inertia('rdashboard', 'rdashboard')->name('rdashboard');
+// });
 
 require __DIR__.'/settings.php';
