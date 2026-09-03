@@ -4,58 +4,6 @@ html, body {
     height: 100%;
 }
 
-body {
-    display: flex;
-    justify-content: flex-end;  
-    align-items: center;
-    min-height: 100vh;
-}
-
-.loginbox {
-    width: 700px;   
-    height: 100vh;
-    background: #10e946;
-    color: #000000;
-    box-sizing: border-box;
-    padding: 70px 30px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 10px #000000;
-}
-
-.school {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 60%;
-    height: 100vh;
-    object-fit: cover;
-    z-index: -1;
-    opacity: 0.9;
-    filter: brightness(0.6);  
-}
-
-.containerlogo{
-    background: #19c945;
-    border-color: black;
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 700px;
-    height: 55px;
-    border-radius: 0 0 10px 10px;
-    box-shadow: 0 0 10px #000000;
-}
-
-.Welcome {
-    font-size: 40px;
-    margin-bottom: 30px;
-    font-family: 'Arial', sans-serif;
-    color: #000000;
-}
-
 .username, .password {
     width: 80%;
     height: 40px;
