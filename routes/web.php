@@ -16,4 +16,8 @@ Route::get('/rdashboard', function () {
    // Route::inertia('rdashboard', 'rdashboard')->name('rdashboard');
 // });
 
+Route::get('/register', function () {
+    return view('register');
+})->name('register');
+
 require __DIR__.'/settings.php';
