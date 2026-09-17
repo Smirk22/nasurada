@@ -36,3 +36,21 @@
     opacity: 0.8;
     box-shadow: 0 0 5px #000000;
 }
+
+.login-link {
+    display: block;
+    margin-top: 20px;
+    color: #000000;
+    text-decoration: underline;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.login-link:hover {
+    transform: scale(1.1);
+    color: #8bdf90;
+}
+
+.login-link:active {
+    transform: scale(0.9);
+    opacity: 0.8;
+}

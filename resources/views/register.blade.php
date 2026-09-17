@@ -26,7 +26,7 @@
         Register
      </h1>
      
-     <form action="{{ route('register') }}" method="POST" class="position-relative d-flex flex-column align-items-center" style="width: 700px;">
+     <form action="{{ route('register') }}" method="POST" autocomplete="off" class="position-relative d-flex flex-column align-items-center" style="width: 700px;">
       @csrf
       <input type="text" class="username" name="username" placeholder="Username" required />
       <input type="email" class="email" name="email" placeholder="Email" required />
@@ -47,6 +47,10 @@
 
      <footer class="position-absolute bottom-0 start-0 w-100 text-center py-3" style="background: #46CB18; border-radius: 10px 10px 0 0;  box-shadow: 0 0 10px #000000;">
      </footer>
+
+      <a href="{{ route('login') }}" class="login-link" style="margin-top: 20px; color: #000000; text-decoration: underline;">
+            Already have an account? Login
+        </a>
  
  </div>
 

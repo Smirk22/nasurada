@@ -23,7 +23,7 @@
 
         <h1 id="welcome-heading" style="font-size: 40px; margin-bottom: 30px; font-family: 'Inter', sans-serif; color: black;">Welcome User!</h1>
 
-        <form  action="{{ route('login') }}" method="POST" class="position-relative d-flex flex-column align-items-center" style="width: 700px;">
+        <form  action="{{ route('login') }}" method="POST" autocomplete="off" class="position-relative d-flex flex-column align-items-center" style="width: 700px;">
             @csrf
          <input type="text" class="username" name="username" placeholder="Username" required />
          <input type="password" class="password" name="password" placeholder="Password" required />
