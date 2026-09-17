@@ -1,23 +1,21 @@
 <?php
-
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
 
-Route::get('/login', function () {
-    return view('login');
-})->name('login');
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 
-Route::get('/rdashboard', function () {
-    return view('rdashboard');
-})->name('rdashboard');
+Route::post('/login', [AuthController::class, 'login']);
 
-// Route::middleware(['auth', 'verified'])->group(function () {
-   // Route::inertia('rdashboard', 'rdashboard')->name('rdashboard');
-// });
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::get('/register', function () {
-    return view('register');
-})->name('register');
+Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+
+Route::post('/register', [AuthController::class, 'register']);
+
+Route::middleware(['auth', 'verified'])->group(function () {
+   Route::inertia('rdashboard', 'rdashboard')->name('rdashboard');
+});
 
 require __DIR__.'/settings.php';
