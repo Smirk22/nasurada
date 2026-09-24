@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
@@ -42,7 +42,7 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        
+
         return redirect('/login');
     }
 
@@ -55,15 +55,15 @@ class AuthController extends Controller
     {
         $validated = $request->validate([
             'username' => ['required', 'string', 'max:100', 'unique:accounts,username'],
-            'email'    => ['required', 'email', 'unique:accounts,email'],
+            'email' => ['required', 'email', 'unique:accounts,email'],
             'password' => ['required', 'min:8'],
         ]);
 
         User::create([
             'username' => $validated['username'],
-            'email'    => $validated['email'],
+            'email' => $validated['email'],
             'password' => $validated['password'], // Automatically hashed by User model casting
-            'role'     => 'registrar',
+            'role' => 'registrar',
         ]);
 
         return redirect('/login')->with('success', 'Account created successfully. Please log in.');

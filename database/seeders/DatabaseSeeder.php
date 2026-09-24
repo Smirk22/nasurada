@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
         // Seed initial registrar account
         User::create([
             'username' => 'admin',
-            'email'    => 'admin@ieti.edu.ph',
+            'email' => 'admin@ieti.edu.ph',
             'password' => 'password123',
-            'role'     => 'registrar',
+            'role' => 'registrar',
         ]);
 
         // Seed initial student records

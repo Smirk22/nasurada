@@ -24,8 +24,8 @@ class RegistrarController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('student_number', 'like', "%{$search}%");
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('student_number', 'like', "%{$search}%");
             });
         }
 
@@ -46,12 +46,12 @@ class RegistrarController extends Controller
     {
         $validated = $request->validate([
             'student_number' => 'required|unique:students,student_number',
-            'first_name'     => 'required|string|max:255',
-            'last_name'      => 'required|string|max:255',
-            'course'         => 'required|string|max:100',
-            'year_level'     => 'required|integer',
-            'section'        => 'required|string|max:50',
-            'rfid_tag'       => 'nullable|string|unique:students,rfid_tag',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'course' => 'required|string|max:100',
+            'year_level' => 'required|integer',
+            'section' => 'required|string|max:50',
+            'rfid_tag' => 'nullable|string|unique:students,rfid_tag',
         ]);
 
         $validated['status'] = 'Enrolled';
@@ -69,14 +69,14 @@ class RegistrarController extends Controller
     public function update(Request $request, Student $student)
     {
         $validated = $request->validate([
-            'student_number' => 'required|unique:students,student_number,' . $student->id,
-            'first_name'     => 'required|string|max:255',
-            'last_name'      => 'required|string|max:255',
-            'course'         => 'required|string|max:100',
-            'year_level'     => 'required|integer',
-            'section'        => 'required|string|max:50',
-            'rfid_tag'       => 'nullable|string|unique:students,rfid_tag,' . $student->id,
-            'status'         => 'required|string',
+            'student_number' => 'required|unique:students,student_number,'.$student->id,
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'course' => 'required|string|max:100',
+            'year_level' => 'required|integer',
+            'section' => 'required|string|max:50',
+            'rfid_tag' => 'nullable|string|unique:students,rfid_tag,'.$student->id,
+            'status' => 'required|string',
         ]);
 
         $student->update($validated);
@@ -103,7 +103,7 @@ class RegistrarController extends Controller
     public function unenrollAll()
     {
         Student::query()->update([
-            'status'   => 'Unenrolled',
+            'status' => 'Unenrolled',
             'rfid_tag' => null,
         ]);
 

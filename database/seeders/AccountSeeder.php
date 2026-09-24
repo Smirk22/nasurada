@@ -19,9 +19,9 @@ class AccountSeeder extends Seeder
             DB::table('accounts')->updateOrInsert(
                 ['email' => $account['email']],
                 [
-                    'username'   => $account['username'],
-                    'password'   => Hash::make($account['password']),
-                    'role'       => $account['role'],
+                    'username' => $account['username'],
+                    'password' => Hash::make($account['password']),
+                    'role' => $account['role'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]
