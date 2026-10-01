@@ -25,17 +25,24 @@ class AuthController extends Controller
 
             $user = Auth::user();
 
-            if (strtolower($user->role) === 'admin') {
-                return redirect()->intended('/adashboard');
-            }
-
-            return redirect()->intended('/rdashboard');
+          // 1. Admin redirect
+        if (strtolower($user->role) === 'admin') {
+            return redirect()->intended('/adashboard');
         }
 
-        return back()->withErrors([
-            'username' => 'The provided credentials do not match our records.',
-        ])->onlyInput('username');
+        // 2. Guard redirect
+        if (strtolower($user->role) === 'guard') {
+            return redirect()->intended('/guard/dashboard');
+        }
+
+        // 3. Registrar (default fallback)
+        return redirect()->intended('/rdashboard');
     }
+
+    return back()->withErrors([
+        'username' => 'The provided credentials do not match our records.',
+    ])->onlyInput('username');
+}
 
     public function logout(Request $request)
     {

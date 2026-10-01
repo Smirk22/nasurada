@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegistrarController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\EntryLogController;
+use App\Http\Controllers\GuardController;
 
 Route::inertia('/', 'welcome')->name('home');
 
@@ -35,6 +36,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/registrar/entry-logs', [EntryLogController::class, 'index'])->name('entry-logs.index');
     Route::get('/registrar/entry-logs/section/{section}', [EntryLogController::class, 'getBySection'])->name('entry-logs.getBySection');
     Route::post('/registrar/entry-logs', [EntryLogController::class, 'store'])->name('entry-logs.store');
+
+// Guard Routes
+Route::middleware(['auth'])->prefix('guard')->group(function () {
+    Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
+    Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
+});
+
+// Kiosk Display (Public)
+Route::middleware(['auth'])->prefix('guard')->group(function () {
+    Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
+    Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk'); // <--- Add this line
+    Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
+});
 });
 
 require __DIR__.'/settings.php';

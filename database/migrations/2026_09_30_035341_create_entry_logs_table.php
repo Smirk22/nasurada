@@ -1,32 +1,32 @@
 <?php
 
-namespace App\Models;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class EntryLog extends Model
+return new class extends Migration
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'student_id',
-        'date',
-        'time_in',
-        'time_out',
-    ];
-
-    protected $casts = [
-        'date' => 'date',
-        'time_in' => 'datetime:H:i:s',
-        'time_out' => 'datetime:H:i:s',
-    ];
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('entry_logs', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('student_id')->nullable()->constrained()->onDelete('cascade');
+            $table->date('date');
+            $table->time('time_in')->nullable();
+            $table->time('time_out')->nullable();
+            $table->string('status')->default('granted');
+            $table->timestamps();
+        });
+    }
 
     /**
-     * Relationship: Entry Log belongs to a Student
+     * Reverse the migrations.
      */
-    public function student()
+    public function down(): void
     {
-        return $this->belongsTo(Student::class);
+        Schema::dropIfExists('entry_logs');
     }
-}
+};
