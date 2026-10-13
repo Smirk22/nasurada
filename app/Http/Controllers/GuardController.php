@@ -16,8 +16,8 @@ class GuardController extends Controller
     public function dashboard()
     {
         // Redirect non-guard users
-        if (strtolower(Auth::user()->role) !== 'guard') {
-            return redirect('/rdashboard');
+        if (strtolower(Auth::user()->role) !== 'security') {
+            return redirect('/Security/dashboard');
         }
 
         $today = today();

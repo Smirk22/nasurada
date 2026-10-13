@@ -31,8 +31,8 @@ class AuthController extends Controller
         }
 
         // 2. Guard redirect
-        if (strtolower($user->role) === 'guard') {
-            return redirect()->intended('/guard/dashboard');
+        if (strtolower($user->role) === 'security') {
+            return redirect()->intended('/Security/dashboard');
         }
 
         // 3. Registrar (default fallback)
