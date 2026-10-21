@@ -51,7 +51,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-500 text-sm font-medium">Students Verified Today</p>
-                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $studentsVerifiedToday ?? 0 }}</p>
+                                <p id="stat-verified" class="text-3xl font-bold text-gray-800 mt-2">{{ $studentsVerifiedToday ?? 0 }}</p>
                             </div>
                             <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -64,7 +64,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-500 text-sm font-medium">Visitors on Campus</p>
-                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $visitorsOnCampus ?? 0 }}</p>
+                                <p id="stat-visitors" class="text-3xl font-bold text-gray-800 mt-2">{{ $visitorsOnCampus ?? 0 }}</p>
                             </div>
                             <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 8.646 4 4 0 010-8.646M15 12H9m6 0a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -77,7 +77,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-500 text-sm font-medium">Entries Denied</p>
-                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesDenied ?? 0 }}</p>
+                                <p id="stat-denied" class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesDenied ?? 0 }}</p>
                             </div>
                             <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -103,7 +103,7 @@
                                 <th class="p-4">Enrollment</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100 text-sm">
+                        <tbody id="live-feed" class="divide-y divide-gray-100 text-sm">
                             @forelse($entryLogs as $log)
                                 <tr class="hover:bg-gray-50 transition">
                                     <td class="p-4">
@@ -216,7 +216,7 @@
                     </div>
 
                     <!-- Alerts Section -->
-                    <div class="space-y-4">
+                    <div id="alerts-list" class="space-y-3">
                         <div class="bg-white rounded-xl shadow border border-gray-100 p-6 border-l-4 border-l-red-500">
                             <h2 class="text-lg font-bold text-gray-800 mb-4">⚠️ Alerts</h2>
                             <div class="space-y-3">
@@ -236,7 +236,7 @@
                         <!-- Quick Stats -->
                         <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
                             <h2 class="text-lg font-bold text-gray-800 mb-4">📊 Today's Summary</h2>
-                            <div class="space-y-2">
+                            <div id="summary-box" class="space-y-2">
                                 <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
                                     <span class="text-sm text-gray-700">Total Entries</span>
                                     <span class="font-bold text-lg text-ieti-green">{{ $totalEntries ?? 0 }}</span>
@@ -276,6 +276,46 @@
 
         updateDateTime();
         setInterval(updateDateTime, 1000); // Update every second
+    </script>
+
+    <script>
+     const refreshIds = [
+        'stat-verified', 'stat-visitors', 'stat-denied',
+        'live-feed', 'alerts-list', 'summary-box'
+     ];
+
+     async function refreshDashboard() {
+        if (document.hidden) return;   // skip while the tab isn't visible
+
+        try {
+            const res = await fetch(window.location.href, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store'
+            });
+
+            // Session expired: the server redirected to the login page
+            if (res.redirected) {
+                window.location.reload();
+                return;
+            }
+            if (!res.ok) return;
+
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+
+            refreshIds.forEach(id => {
+                const fresh = doc.getElementById(id);
+                const current = document.getElementById(id);
+                if (fresh && current) {
+                    current.innerHTML = fresh.innerHTML;
+                }
+            });
+        } catch (e) {
+            // network hiccup: try again on the next tick
+        }
+      }
+
+       setInterval(refreshDashboard, 3000);   // every 3 seconds
     </script>
 
 </body>

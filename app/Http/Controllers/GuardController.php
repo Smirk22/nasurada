@@ -14,59 +14,75 @@ class GuardController extends Controller
      * Display Guard Dashboard
      */
     public function dashboard()
-    {
-        // Redirect non-guard users
-        if (strtolower(Auth::user()->role) !== 'security') {
-            return redirect('/Security/dashboard');
-        }
-
-        $today = today();
-
-        // Get entry logs for today
-        $entryLogs = EntryLog::whereDate('date', $today)
-            ->with('student')
-            ->orderBy('time_in', 'desc')
-            ->limit(10)
-            ->get();
-
-        // Count students verified today
-        $studentsVerifiedToday = EntryLog::whereDate('date', $today)
-            ->distinct('student_id')
-            ->count('student_id');
-
-        // Count visitors on campus
-        $visitorsOnCampus = 0; // TODO: Connect to visitors table
-
-        // Count entries denied
-        $entriesDenied = 0; // TODO: Implement denied entries tracking
-
-        // Calculate currently in/out
-        $currentlyIn = EntryLog::whereDate('date', $today)
-            ->whereNull('time_out')
-            ->count();
-
-        $currentlyOut = EntryLog::whereDate('date', $today)
-            ->whereNotNull('time_out')
-            ->count();
-
-        $totalEntries = $entryLogs->count();
-
-        // Get available RFID tags (unassigned to students)
-        $allStudents = Student::pluck('rfid_tag')->filter()->toArray();
-        $availableRfids = $this->generateAvailableRfids($allStudents);
-
-        return view('guards.dashboard', [
-            'entryLogs' => $entryLogs,
-            'studentsVerifiedToday' => $studentsVerifiedToday,
-            'visitorsOnCampus' => $visitorsOnCampus,
-            'entriesDenied' => $entriesDenied,
-            'totalEntries' => $totalEntries,
-            'currentlyIn' => $currentlyIn,
-            'currentlyOut' => $currentlyOut,
-            'deniedEntries' => [],
-            'availableRfids' => $availableRfids,
-        ]);
+   {
+    // Only security accounts may open this page
+    if (strtolower(trim(Auth::user()->role)) !== 'security') {
+        abort(403);
     }
+
+    $today = today();
+
+    // Live feed: granted scans only, most recently scanned first
+    $entryLogs = EntryLog::whereDate('date', $today)
+        ->where('status', 'granted')
+        ->with('student')
+        ->orderByDesc('updated_at')
+        ->limit(10)
+        ->get();
+
+    $studentsVerifiedToday = EntryLog::whereDate('date', $today)
+        ->where('status', 'granted')
+        ->distinct()
+        ->count('student_id');
+
+    $entriesDenied = EntryLog::whereDate('date', $today)
+        ->where('status', 'denied')
+        ->count();
+
+    $currentlyIn = EntryLog::whereDate('date', $today)
+        ->where('status', 'granted')
+        ->whereNull('time_out')
+        ->count();
+
+    $currentlyOut = EntryLog::whereDate('date', $today)
+        ->where('status', 'granted')
+        ->whereNotNull('time_out')
+        ->count();
+
+    $totalEntries = EntryLog::whereDate('date', $today)
+        ->where('status', 'granted')
+        ->count();
+
+    // Alerts box: the 5 most recent denied scans
+    $deniedEntries = EntryLog::whereDate('date', $today)
+        ->where('status', 'denied')
+        ->with('student')
+        ->orderByDesc('id')
+        ->limit(5)
+        ->get()
+        ->map(fn ($log) => [
+            'time' => optional($log->student)->first_name . ' ' . optional($log->student)->last_name
+                    . ' at ' . Carbon::parse($log->time_in)->format('H:i'),
+        ])
+        ->all();
+
+    $visitorsOnCampus = 0; // TODO: connect to a visitors table
+
+    $allStudents = Student::pluck('rfid_tag')->filter()->toArray();
+    $availableRfids = $this->generateAvailableRfids($allStudents);
+
+    return view('guards.dashboard', [
+        'entryLogs' => $entryLogs,
+        'studentsVerifiedToday' => $studentsVerifiedToday,
+        'visitorsOnCampus' => $visitorsOnCampus,
+        'entriesDenied' => $entriesDenied,
+        'totalEntries' => $totalEntries,
+        'currentlyIn' => $currentlyIn,
+        'currentlyOut' => $currentlyOut,
+        'deniedEntries' => $deniedEntries,
+        'availableRfids' => $availableRfids,
+    ]);
+   }
 
     /**
      * Display Portable Kiosk Screen
