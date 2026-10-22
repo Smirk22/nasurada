@@ -30,5 +30,12 @@ class DatabaseSeeder extends Seeder
         foreach ($students as $student) {
             Student::create($student);
         }
+
+        {
+         // This runs automatically when seeding
+         $this->call([
+         AccountSeeder::class,
+        ]);
+}
     }
 }
