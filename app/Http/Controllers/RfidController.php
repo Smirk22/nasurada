@@ -14,17 +14,31 @@ class RfidController extends Controller
             'uid' => 'required|string|max:32',
         ]);
 
-        $uid = strtoupper(trim($request->uid));
+        // Remove ALL whitespace and uppercase, so "BB 42 04 23" becomes "BB420423"
+        $uid = strtoupper(preg_replace('/\s+/', '', $request->uid));
 
         // Matches regardless of case or spaces stored in rfid_tag
         $student = Student::whereRaw("UPPER(REPLACE(rfid_tag, ' ', '')) = ?", [$uid])->first();
 
-        if (!$student) {
-            return response()->json(['status' => 'unknown_card'], 404);
-        }
-
         $now   = now();
         $today = $now->toDateString();
+
+        if (!$student) {
+            // Log the unknown/unregistered card so it shows up in the live feed with details!
+            EntryLog::create([
+                'student_id' => null, // No student linked
+                'card_uid'   => $request->uid, // Save the raw UID if your table has a card_uid column, or omit/adjust based on your schema
+                'date'       => $today,
+                'time_in'    => $now->format('H:i:s'),
+                'status'     => 'unknown', // Triggers red warning row
+            ]);
+
+            return response()->json([
+                'status'  => 'unknown_card',
+                'message' => 'Unregistered RFID tag detected',
+                'uid'     => $uid
+            ], 404);
+        }
 
         // Unenrolled or graduated students are denied and logged
         if ($student->status !== 'Enrolled') {

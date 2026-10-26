@@ -47,6 +47,7 @@ Route::middleware(['auth'])->prefix('Security')->group(function () {
 Route::middleware(['auth'])->prefix('Security')->group(function () {
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk'); // <--- Add this line
+    Route::get('/kiosk/latest', [GuardController::class, 'latestScan'])->name('guard.kiosk.latest');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
 });
 });

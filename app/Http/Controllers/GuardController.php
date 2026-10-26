@@ -14,75 +14,74 @@ class GuardController extends Controller
      * Display Guard Dashboard
      */
     public function dashboard()
-   {
-    // Only security accounts may open this page
-    if (strtolower(trim(Auth::user()->role)) !== 'security') {
-        abort(403);
+    {
+        // Only security accounts may open this page
+        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+            abort(403);
+        }
+
+        $today = today();
+
+        // Live feed: Get ALL scans (granted, denied, and unknown), most recently scanned first
+        $entryLogs = EntryLog::whereDate('date', $today)
+            ->with('student')
+            ->orderByDesc('updated_at')
+            ->limit(10)
+            ->get();
+
+        $studentsVerifiedToday = EntryLog::whereDate('date', $today)
+            ->where('status', 'granted')
+            ->distinct()
+            ->count('student_id');
+
+        $entriesDenied = EntryLog::whereDate('date', $today)
+            ->whereIn('status', ['denied', 'unknown'])
+            ->count();
+
+        $currentlyIn = EntryLog::whereDate('date', $today)
+            ->where('status', 'granted')
+            ->whereNull('time_out')
+            ->count();
+
+        $currentlyOut = EntryLog::whereDate('date', $today)
+            ->where('status', 'granted')
+            ->whereNotNull('time_out')
+            ->count();
+
+        $totalEntries = EntryLog::whereDate('date', $today)
+            ->where('status', 'granted')
+            ->count();
+
+        // Alerts box: the 5 most recent denied/unknown scans
+        $deniedEntries = EntryLog::whereDate('date', $today)
+            ->whereIn('status', ['denied', 'unknown'])
+            ->with('student')
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get()
+            ->map(fn ($log) => [
+                'time' => ($log->student ? ($log->student->first_name . ' ' . $log->student->last_name) : ('UID: ' . ($log->card_uid ?? 'Unknown')))
+                        . ' at ' . Carbon::parse($log->time_in)->format('H:i'),
+            ])
+            ->all();
+
+        $visitorsOnCampus = 0; // TODO: connect to a visitors table
+
+        $allStudents = Student::pluck('rfid_tag')->filter()->toArray();
+        $availableRfids = $this->generateAvailableRfids($allStudents);
+
+        return view('guards.dashboard', [
+            'entryLogs' => $entryLogs,
+            'studentsVerifiedToday' => $studentsVerifiedToday,
+            'visitorsOnCampus' => $visitorsOnCampus,
+            'entriesDenied' => $entriesDenied,
+            'totalEntries' => $totalEntries,
+            'currentlyIn' => $currentlyIn,
+            'currentlyOut' => $currentlyOut,
+            'deniedEntries' => $deniedEntries,
+            'availableRfids' => $availableRfids,
+        ]);
     }
-
-    $today = today();
-
-    // Live feed: granted scans only, most recently scanned first
-    $entryLogs = EntryLog::whereDate('date', $today)
-        ->where('status', 'granted')
-        ->with('student')
-        ->orderByDesc('updated_at')
-        ->limit(10)
-        ->get();
-
-    $studentsVerifiedToday = EntryLog::whereDate('date', $today)
-        ->where('status', 'granted')
-        ->distinct()
-        ->count('student_id');
-
-    $entriesDenied = EntryLog::whereDate('date', $today)
-        ->where('status', 'denied')
-        ->count();
-
-    $currentlyIn = EntryLog::whereDate('date', $today)
-        ->where('status', 'granted')
-        ->whereNull('time_out')
-        ->count();
-
-    $currentlyOut = EntryLog::whereDate('date', $today)
-        ->where('status', 'granted')
-        ->whereNotNull('time_out')
-        ->count();
-
-    $totalEntries = EntryLog::whereDate('date', $today)
-        ->where('status', 'granted')
-        ->count();
-
-    // Alerts box: the 5 most recent denied scans
-    $deniedEntries = EntryLog::whereDate('date', $today)
-        ->where('status', 'denied')
-        ->with('student')
-        ->orderByDesc('id')
-        ->limit(5)
-        ->get()
-        ->map(fn ($log) => [
-            'time' => optional($log->student)->first_name . ' ' . optional($log->student)->last_name
-                    . ' at ' . Carbon::parse($log->time_in)->format('H:i'),
-        ])
-        ->all();
-
-    $visitorsOnCampus = 0; // TODO: connect to a visitors table
-
-    $allStudents = Student::pluck('rfid_tag')->filter()->toArray();
-    $availableRfids = $this->generateAvailableRfids($allStudents);
-
-    return view('guards.dashboard', [
-        'entryLogs' => $entryLogs,
-        'studentsVerifiedToday' => $studentsVerifiedToday,
-        'visitorsOnCampus' => $visitorsOnCampus,
-        'entriesDenied' => $entriesDenied,
-        'totalEntries' => $totalEntries,
-        'currentlyIn' => $currentlyIn,
-        'currentlyOut' => $currentlyOut,
-        'deniedEntries' => $deniedEntries,
-        'availableRfids' => $availableRfids,
-    ]);
-   }
 
     /**
      * Display Portable Kiosk Screen
@@ -90,6 +89,51 @@ class GuardController extends Controller
     public function kiosk()
     {
         return view('kiosk.display');
+    }
+
+    /**
+     * Return the most recent scan as JSON.
+     * The Entry Logs display page asks for this every second.
+     */
+    public function latestScan()
+    {
+        // Same role check as the dashboard
+        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+            abort(403);
+        }
+
+        // Newest activity first
+        $log = EntryLog::whereDate('date', today())
+            ->with('student')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+
+        // Nothing scanned today yet
+        if (!$log) {
+            return response()->json(['scan' => null]);
+        }
+
+        $student = $log->student;
+        $isUnknown = is_null($student) || $log->status === 'unknown';
+        $isDenied  = !$isUnknown && $log->status === 'denied';
+        $granted   = !$isUnknown && !$isDenied;
+        $isOut     = $granted && $log->time_out !== null;
+
+        return response()->json([
+            'scan' => [
+                'key'            => $log->id . '-' . $log->updated_at->timestamp,
+                'result'         => ($isUnknown || $isDenied) ? 'denied' : 'granted',
+                'is_unknown'     => $isUnknown,
+                'card_uid'       => $log->card_uid ?? 'Unknown',
+                'action'         => $isUnknown ? 'UNKNOWN' : ($isOut ? 'OUT' : 'IN'),
+                'time'           => Carbon::parse($log->time_in)->format('h:i:s A'),
+                'name'           => $isUnknown ? 'Unregistered Tag' : ($student->first_name . ' ' . $student->last_name),
+                'student_number' => $isUnknown ? ('UID: ' . ($log->card_uid ?? 'N/A')) : $student->student_number,
+                'initial'        => $isUnknown ? '⚠️' : strtoupper(substr($student->first_name, 0, 1)),
+                'photo'          => (!$isUnknown && $student->photo) ? '/storage/' . ltrim($student->photo, '/') : null,
+            ],
+        ]);
     }
 
     /**

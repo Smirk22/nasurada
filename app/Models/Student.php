@@ -17,6 +17,7 @@ class Student extends Model
         'year_level',
         'section',
         'rfid_tag',
+        'photo',
         'status',
     ];
 

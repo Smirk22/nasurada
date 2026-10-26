@@ -8,14 +8,23 @@
     <!-- Navigation Menu -->
     <nav class="flex-1 px-4 py-6 space-y-2">
         <!-- Dashboard -->
-        <a href="{{ auth()->user()->role === 'Security' ? '/Security/dashboard' : '/rdashboard' }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === '/Security/dashboard' || request()->path() === 'rdashboard' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+        <a href="{{ auth()->user()->role === 'Security' ? '/Security/dashboard' : '/rdashboard' }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('Security/dashboard') || request()->is('rdashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 21h6a2 2 0 002-2V9l-7-4-7 4v12a2 2 0 002 2z"></path>
             </svg>
             <span class="text-sm font-medium">Dashboard</span>
         </a>
 
-       
+        {{-- NEW: Security only. Opens the full-screen scan display in a new tab. --}}
+        @if(auth()->user()->role === 'Security')
+            <a href="{{ route('guard.kiosk') }}" target="_blank" rel="noopener" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm font-medium">Entry Logs</span>
+            </a>
+        @endif
+
         @if(auth()->user()->role === 'Registrar')
             <!-- Student Records (Registrar only) -->
             <a href="/registrar/students" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/students' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">

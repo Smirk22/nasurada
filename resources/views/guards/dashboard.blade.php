@@ -92,52 +92,111 @@
                         <h2 class="text-lg font-bold text-gray-800">Live Entry Feed</h2>
                         <p class="text-xs text-gray-500 mt-1">Last scanned students (Real-time)</p>
                     </div>
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
-                                <th class="p-4">Photo</th>
-                                <th class="p-4">Name</th>
-                                <th class="p-4">Student #</th>
-                                <th class="p-4">Time</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4">Enrollment</th>
-                            </tr>
-                        </thead>
-                        <tbody id="live-feed" class="divide-y divide-gray-100 text-sm">
-                            @forelse($entryLogs as $log)
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="p-4">
-                                        <div class="w-10 h-10 bg-ieti-green text-white rounded-full flex items-center justify-center font-bold text-xs">
-                                            {{ strtoupper(substr($log->student->first_name, 0, 1)) }}
-                                        </div>
-                                    </td>
-                                    <td class="p-4 font-semibold text-gray-800">{{ $log->student->first_name }} {{ $log->student->last_name }}</td>
-                                    <td class="p-4 text-gray-600">{{ $log->student->student_number }}</td>
-                                    <td class="p-4">
-                                        <span class="text-sm">
-                                            {{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->format('H:i') : '-' }}
-                                        </span>
-                                    </td>
-                                    <td class="p-4">
-                                        @if($log->time_out)
-                                            <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">🔴 OUT</span>
-                                        @else
-                                            <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">✅ IN</span>
-                                        @endif
-                                    </td>
-                                    <td class="p-4">
-                                        <span class="px-3 py-1 {{ $log->student->status === 'Enrolled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }} text-xs font-semibold rounded-full">
-                                            {{ $log->student->status }}
-                                        </span>
-                                    </td>
+                    
+                    <!-- Scrollable Container -->
+                    <div class="max-h-[380px] overflow-y-auto">
+                        <table class="w-full text-left border-collapse relative">
+                            <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                                <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
+                                    <th class="p-4 bg-gray-50">Photo</th>
+                                    <th class="p-4 bg-gray-50">Name</th>
+                                    <th class="p-4 bg-gray-50">Student #</th>
+                                    <th class="p-4 bg-gray-50">Time In</th>
+                                    <th class="p-4 bg-gray-50">Time Out</th>
+                                    <th class="p-4 bg-gray-50">Status</th>
+                                    <th class="p-4 bg-gray-50">Enrollment</th>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="p-6 text-center text-gray-400 text-sm">No entry logs yet. Waiting for first scan...</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody id="live-feed" class="divide-y divide-gray-100 text-sm">
+                                @forelse($entryLogs as $log)
+                                    @php
+                                        $isUnknown = is_null($log->student_id) || $log->status === 'unknown';
+                                        $isDenied = !$isUnknown && $log->status === 'denied';
+                                        $isBadScan = $isUnknown || $isDenied;
+                                    @endphp
+
+                                    <tr class="{{ $isBadScan ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50' }} transition">
+                                        <!-- Photo / Icon -->
+                                        <td class="p-4">
+                                            @if(!$isUnknown && $log->student && $log->student->photo)
+                                                <img src="{{ asset('storage/' . ltrim($log->student->photo, '/')) }}" class="w-10 h-10 rounded-full object-cover">
+                                            @elseif(!$isUnknown && $log->student)
+                                                <div class="w-10 h-10 bg-ieti-green text-white rounded-full flex items-center justify-center font-bold text-xs">
+                                                    {{ strtoupper(substr($log->student->first_name, 0, 1)) }}
+                                                </div>
+                                            @else
+                                                <div class="w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-sm">
+                                                    ⚠️
+                                                </div>
+                                            @endif
+                                        </td>
+
+                                        <!-- Name -->
+                                        <td class="p-4 font-semibold {{ $isBadScan ? 'text-red-700' : 'text-gray-800' }}">
+                                            @if($isUnknown)
+                                                Unregistered Tag
+                                            @elseif($isDenied)
+                                                {{ $log->student->first_name }} {{ $log->student->last_name }} <span class="text-xs text-red-600 font-bold">(Not Enrolled)</span>
+                                            @else
+                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
+                                            @endif
+                                        </td>
+
+                                        <!-- Student # or Card UID -->
+                                        <td class="p-4 {{ $isBadScan ? 'text-red-600 font-mono font-semibold' : 'text-gray-600' }}">
+                                            @if($isUnknown)
+                                                UID: {{ $log->card_uid ?? 'N/A' }}
+                                            @else
+                                                {{ $log->student->student_number }}
+                                            @endif
+                                        </td>
+
+                                        <!-- Time In -->
+                                        <td class="p-4">
+                                            <span class="text-sm text-gray-800">
+                                                {{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->format('H:i') : '-' }}
+                                            </span>
+                                        </td>
+
+                                        <!-- Time Out -->
+                                        <td class="p-4">
+                                            <span class="text-sm text-gray-400">
+                                                {{ $log->time_out ? \Carbon\Carbon::parse($log->time_out)->format('H:i') : '-' }}
+                                            </span>
+                                        </td>
+
+                                        <!-- Status -->
+                                        <td class="p-4">
+                                            @if($isUnknown)
+                                                <span class="px-3 py-1 bg-red-200 text-red-900 text-xs font-bold rounded-full">❌ UNKNOWN</span>
+                                            @elseif($isDenied)
+                                                <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full">⛔ DENIED</span>
+                                            @elseif($log->time_out)
+                                                <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">🔴 OUT</span>
+                                            @else
+                                                <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">✅ IN</span>
+                                            @endif
+                                        </td>
+
+                                        <!-- Enrollment / Details -->
+                                        <td class="p-4">
+                                            @if($isUnknown)
+                                                <span class="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">Not in Database</span>
+                                            @else
+                                                <span class="px-3 py-1 {{ $log->student->status === 'Enrolled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }} text-xs font-semibold rounded-full">
+                                                    {{ $log->student->status }}
+                                                </span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="p-6 text-center text-gray-400 text-sm">No entry logs yet. Waiting for first scan...</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <!-- Register Visitor Section -->
@@ -313,7 +372,7 @@
         } catch (e) {
             // network hiccup: try again on the next tick
         }
-      }
+     }
 
        setInterval(refreshDashboard, 3000);   // every 3 seconds
     </script>
