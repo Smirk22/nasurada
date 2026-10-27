@@ -44,8 +44,7 @@
 
                         <button type="submit" class="auth-button">Login</button>
                     </form>
-
-                    <a href="{{ route('register') }}" class="auth-link">Don't have an account? Register</a>
+                    
                 </div>
             </div>
 
