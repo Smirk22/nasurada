@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RoleMiddleware;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            PreventBackHistory::class,
         ]);
 
         $middleware->alias([
