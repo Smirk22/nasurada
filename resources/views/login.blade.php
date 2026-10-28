@@ -25,17 +25,17 @@
                     <h1 class="auth-form-wrap__heading">Welcome, user!</h1>
                     <p class="auth-form-wrap__lead">Enter your credentials to continue.</p>
 
-                    <form action="{{ route('login') }}" method="POST" class="auth-form">
+                    <form action="{{ route('login') }}" method="POST" class="auth-form" autocomplete="off">
                         @csrf
 
                         <label class="auth-field">
                             <span class="auth-field__label">Username</span>
-                            <input type="text" name="username" placeholder="Enter your username" required autofocus>
+                            <input type="text" name="username" placeholder="Enter your username" required autofocus autocomplete="off">
                         </label>
 
                         <label class="auth-field">
                             <span class="auth-field__label">Password</span>
-                            <input type="password" name="password" placeholder="Enter your password" required>
+                            <input type="password" name="password" placeholder="Enter your password" required autocomplete="off">
                         </label>
 
                         @if ($errors->any())
@@ -53,4 +53,18 @@
         </div>
     </div>
 </body>
+
+<script>
+    function clearLoginForm() {
+        document.querySelectorAll('form.auth-form input[name="username"], form.auth-form input[name="password"]')
+            .forEach(function (input) { input.value = ''; });
+    }
+
+    // Runs on normal load and when the browser restores the page with Back/Forward
+    window.addEventListener('pageshow', function () {
+        clearLoginForm();
+        setTimeout(clearLoginForm, 50);   // some browsers refill the fields a moment after restoring
+    });
+</script>
+
 </html>

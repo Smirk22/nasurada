@@ -10,11 +10,10 @@ use Illuminate\Support\Facades\Route;
 // Send the home page to the login page
 Route::redirect('/', '/login')->name('home');
 
-// Login / Logout
-Route::middleware('guest')->group(function () {
-    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [AuthController::class, 'login'])->name('login.store');
-});
+// Login / Logout (no guest middleware, so /login always shows the form)
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.store');
+
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
 // Admin Routes (admin only)
