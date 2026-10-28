@@ -8,17 +8,33 @@
     <style>
         .bg-ieti-green { background-color: #064e29; }
         .text-ieti-green { color: #064e29; }
+
+        /* Hide the page scrollbar */
+        html, body {
+            height: 100%;
+            scrollbar-width: none;       /* Firefox */
+            -ms-overflow-style: none;    /* old Edge */
+        }
+        html::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            display: none;               /* Chrome, Edge, Safari */
+        }
+
+        /* Slim scrollbars for the inner boxes (activity log) */
+        .inner-scroll { scrollbar-width: thin; }
+        .inner-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .inner-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 9999px; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans min-h-screen flex flex-col justify-between">
+<body class="bg-gray-100 font-sans h-screen overflow-hidden flex flex-col">
 
     <!-- Header -->
-    <header class="bg-ieti-green text-white shadow-md rounded-b-2xl px-6 py-4">
+    <header class="bg-ieti-green text-white shadow-md rounded-b-2xl px-6 py-4 shrink-0">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <span class="font-bold text-lg tracking-wide">IETI - System Administration</span>
             <nav class="flex items-center space-x-6 text-sm font-medium">
                 <a href="/adashboard" class="text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1">Admin Dashboard</a>
-                
+
                 <form action="{{ route('logout') }}" method="POST" class="inline">
                     @csrf
                     <button type="submit" class="hover:text-red-300 transition text-sm font-semibold ml-2">Log Out</button>
@@ -28,38 +44,38 @@
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto w-full px-6 py-8 flex-1 space-y-6">
+    <main class="max-w-7xl mx-auto w-full px-6 py-4 flex-1 min-h-0 flex flex-col gap-4">
 
         @if(session('success'))
-            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl shadow-sm">
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl shadow-sm shrink-0">
                 {{ session('success') }}
             </div>
         @endif
 
         <!-- Summary Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="bg-white rounded-xl p-5 shadow border border-gray-100 flex flex-col justify-between">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+            <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-gray-500 uppercase">System Staff Users</span>
-                <div class="text-3xl font-extrabold text-ieti-green mt-2">{{ $totalUsers }}</div>
-                <span class="text-xs text-green-600 mt-2 font-medium">Admins, Registrars & Security</span>
+                <div class="text-3xl font-extrabold text-ieti-green mt-1">{{ $totalUsers }}</div>
+                <span class="text-xs text-green-600 mt-1 font-medium">Admins, Registrars & Security</span>
             </div>
 
-            <div class="bg-white rounded-xl p-5 shadow border border-gray-100 flex flex-col justify-between">
+            <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-gray-500 uppercase">Total Students</span>
-                <div class="text-3xl font-extrabold text-blue-600 mt-2">{{ $totalStudents }}</div>
-                <span class="text-xs text-blue-600 mt-2 font-medium">Enrolled & Unenrolled</span>
+                <div class="text-3xl font-extrabold text-blue-600 mt-1">{{ $totalStudents }}</div>
+                <span class="text-xs text-blue-600 mt-1 font-medium">Enrolled & Unenrolled</span>
             </div>
 
-            <div class="bg-white rounded-xl p-5 shadow border border-gray-100 flex flex-col justify-between">
+            <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-gray-500 uppercase">Invalid RFID Scans</span>
-                <div class="text-3xl font-extrabold text-red-600 mt-2">{{ $invalidRfidScans }}</div>
-                <span class="text-xs text-red-600 mt-2 font-medium">Security Alerts Logged</span>
+                <div class="text-3xl font-extrabold text-red-600 mt-1">{{ $invalidRfidScans }}</div>
+                <span class="text-xs text-red-600 mt-1 font-medium">Security Alerts Logged</span>
             </div>
         </div>
 
         <!-- System User Management -->
-        <div class="bg-white rounded-2xl p-6 shadow border border-gray-100 space-y-4">
-            <div class="flex justify-between items-center">
+        <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-3">
+            <div class="flex justify-between items-center shrink-0">
                 <div>
                     <h2 class="text-lg font-bold text-gray-800">User Account Management</h2>
                     <p class="text-xs text-gray-500">Manage staff access roles (Admin, Registrar, Security Guard).</p>
@@ -71,8 +87,8 @@
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
+                    <thead class="bg-gray-50">
+                        <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
                             <th class="p-3">Name</th>
                             <th class="p-3">Username</th>
                             <th class="p-3">Email</th>
@@ -87,7 +103,7 @@
                                 <td class="p-3 text-gray-600">{{ $user->username }}</td>
                                 <td class="p-3 text-gray-600">{{ $user->email }}</td>
                                 <td class="p-3">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                    <span class="px-2 py-1 text-xs font-semibold rounded-full
                                         {{ $user->role === 'Admin' ? 'bg-purple-100 text-purple-800' : ($user->role === 'Registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">
                                         {{ $user->role ?? 'Registrar' }}
                                     </span>
@@ -108,8 +124,8 @@
         </div>
 
         <!-- Live Staff Activity Feed -->
-        <div class="bg-white rounded-2xl p-6 shadow border border-gray-100 space-y-4">
-            <div class="flex justify-between items-center">
+        <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col flex-1 min-h-0 gap-3">
+            <div class="flex justify-between items-center shrink-0">
                 <div>
                     <h2 class="text-lg font-bold text-gray-800">Live Activity Monitor</h2>
                     <p class="text-xs text-gray-500">Real-time audit log of Registrar & Security actions.</p>
@@ -120,11 +136,11 @@
             </div>
 
             <!-- Scrollable log container -->
-            <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto pr-2 space-y-1">
+            <div class="divide-y divide-gray-100 flex-1 min-h-0 overflow-y-auto pr-2 inner-scroll">
                 @forelse($activities as $act)
                     <div class="py-3 flex justify-between items-center text-sm">
                         <div class="flex items-center space-x-3">
-                            <span class="font-bold text-xs px-2.5 py-1 rounded-md 
+                            <span class="font-bold text-xs px-2.5 py-1 rounded-md
                                 {{ strtolower($act->role) === 'admin' ? 'bg-purple-100 text-purple-800' : (strtolower($act->role) === 'registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">
                                 {{ $act->role }}
                             </span>
@@ -208,6 +224,11 @@
             document.getElementById('edit_user_role').value = user.role || 'Registrar';
             openModal('editUserModal');
         }
+
+        // Reload if the browser restores this page from its back/forward cache
+        window.addEventListener('pageshow', function (e) {
+            if (e.persisted) { window.location.reload(); }
+        });
     </script>
 
 </body>
