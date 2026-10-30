@@ -2,9 +2,10 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\RegistrarController;
 use App\Http\Controllers\EntryLogController;
 use App\Http\Controllers\GuardController;
+use App\Http\Controllers\RegistrarController;
+use App\Http\Controllers\TwoFactorSetupController;
 use Illuminate\Support\Facades\Route;
 
 // Send the home page to the login page
@@ -14,7 +15,21 @@ Route::redirect('/', '/login')->name('home');
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 
+// Two-factor challenge (used after a correct username/password when 2FA is enabled)
+Route::get('/two-factor-verify', [AuthController::class, 'showTwoFactorChallenge'])->name('two-factor.challenge');
+Route::post('/two-factor-verify', [AuthController::class, 'verifyTwoFactorChallenge'])->name('two-factor.challenge.verify');
+Route::post('/two-factor-verify/cancel', [AuthController::class, 'cancelTwoFactorChallenge'])->name('two-factor.challenge.cancel');
+
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
+
+// Two-factor authentication management (any signed-in staff member)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/settings/two-factor', [TwoFactorSetupController::class, 'edit'])->name('two-factor.setup');
+    Route::post('/settings/two-factor/enable', [TwoFactorSetupController::class, 'enable'])->name('two-factor.setup.enable');
+    Route::post('/settings/two-factor/confirm', [TwoFactorSetupController::class, 'confirm'])->name('two-factor.setup.confirm');
+    Route::post('/settings/two-factor/recovery-codes', [TwoFactorSetupController::class, 'regenerateRecoveryCodes'])->name('two-factor.setup.recovery-codes');
+    Route::delete('/settings/two-factor', [TwoFactorSetupController::class, 'destroy'])->name('two-factor.setup.disable');
+});
 
 // Admin Routes (admin only)
 Route::middleware(['auth', 'role:Admin'])->group(function () {

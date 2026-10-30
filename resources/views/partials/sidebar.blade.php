@@ -15,6 +15,14 @@
             <span class="text-sm font-medium">Dashboard</span>
         </a>
 
+        <!-- Two-Factor Authentication -->
+        <a href="{{ route('two-factor.setup') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('settings/two-factor') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751A11.959 11.959 0 0112 2.714z"></path>
+            </svg>
+            <span class="text-sm font-medium">Two-Factor Auth</span>
+        </a>
+
         {{-- NEW: Security only. Opens the full-screen scan display in a new tab. --}}
         @if(auth()->user()->role === 'Security')
             <a href="{{ route('guard.kiosk') }}" target="_blank" rel="noopener" class="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">

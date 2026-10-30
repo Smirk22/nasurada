@@ -34,6 +34,7 @@
             <span class="font-bold text-lg tracking-wide">IETI - System Administration</span>
             <nav class="flex items-center space-x-6 text-sm font-medium">
                 <a href="/adashboard" class="text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1">Admin Dashboard</a>
+                <a href="{{ route('two-factor.setup') }}" class="hover:text-green-200 transition font-semibold">Two-Factor Auth</a>
 
                 <form action="{{ route('logout') }}" method="POST" class="inline">
                     @csrf
