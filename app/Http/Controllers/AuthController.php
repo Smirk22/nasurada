@@ -5,21 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class AuthController extends Controller
 {
 
     public function showLoginForm(Request $request)
     {
-    if (Auth::check()) {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-    }
+        if (Auth::check()) {
+            $request->session()->forget('guard_logged_in_at');
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
-    return response()
-        ->view('login')
-        ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        return response()
+            ->view('login')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 
     public function login(Request $request)
@@ -33,33 +35,37 @@ class AuthController extends Controller
             $request->session()->regenerate();
 
             $user = Auth::user();
+            $role = strtolower(trim($user->role));
 
-          // 1. Admin redirect
-        if (strtolower($user->role) === 'admin') {
-            return redirect()->intended('/adashboard');
+            // 1. Admin redirect
+            if ($role === 'admin') {
+                return redirect()->intended('/adashboard');
+            }
+
+            // 2. Guard redirect (Explicitly clear old timestamp and set fresh login time to reset live entry feed)
+            if ($role === 'security') {
+                $request->session()->forget('guard_logged_in_at');
+                $request->session()->put('guard_logged_in_at', Carbon::now());
+                return redirect()->intended('/Security/dashboard');
+            }
+
+            // 3. Registrar (default fallback)
+            return redirect()->intended('/rdashboard');
         }
 
-        // 2. Guard redirect
-        if (strtolower($user->role) === 'security') {
-            return redirect()->intended('/Security/dashboard');
-        }
-
-        // 3. Registrar (default fallback)
-        return redirect()->intended('/rdashboard');
+        return back()->withErrors([
+            'username' => 'The provided credentials do not match our records.',
+        ])->onlyInput('username');
     }
-
-    return back()->withErrors([
-        'username' => 'The provided credentials do not match our records.',
-    ])->onlyInput('username');
-}
 
     public function logout(Request $request)
     {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+       $request->session()->forget('feed_reset_after_id');
+       Auth::logout();
+       $request->session()->invalidate();
+       $request->session()->regenerateToken();
 
-        return redirect('/login');
+       return redirect('/login');
     }
 
     public function showRegisterForm()

@@ -13,7 +13,7 @@ class GuardController extends Controller
     /**
      * Display Guard Dashboard
      */
-    public function dashboard()
+    public function dashboard(Request $request)
     {
         // Only security accounts may open this page
         if (strtolower(trim(Auth::user()->role)) !== 'security') {
@@ -22,12 +22,16 @@ class GuardController extends Controller
 
         $today = today();
 
-        // Live feed: Get ALL scans (granted, denied, and unknown), most recently scanned first
+        // Live feed: Show today's last scanned students (unique per student/log)
         $entryLogs = EntryLog::whereDate('date', $today)
             ->with('student')
             ->orderByDesc('updated_at')
-            ->limit(10)
-            ->get();
+            ->orderByDesc('id')
+            ->get()
+            ->unique(function ($item) {
+                return $item->student_id ? 'student_' . $item->student_id : 'log_' . $item->id;
+            })
+            ->take(10);
 
         $studentsVerifiedToday = EntryLog::whereDate('date', $today)
             ->where('status', 'granted')

@@ -24,13 +24,13 @@ class RfidController extends Controller
         $today = $now->toDateString();
 
         if (!$student) {
-            // Log the unknown/unregistered card so it shows up in the live feed with details!
+            // Log the unknown/unregistered card so it shows up in the live feed
             EntryLog::create([
-                'student_id' => null, // No student linked
-                'card_uid'   => $request->uid, // Save the raw UID if your table has a card_uid column, or omit/adjust based on your schema
+                'student_id' => null, 
+                'card_uid'   => $request->uid, 
                 'date'       => $today,
                 'time_in'    => $now->format('H:i:s'),
-                'status'     => 'unknown', // Triggers red warning row
+                'status'     => 'unknown', 
             ]);
 
             return response()->json([
@@ -55,22 +55,41 @@ class RfidController extends Controller
             ], 403);
         }
 
-        // Is there an open entry today (time_in but no time_out yet)?
-        $openLog = EntryLog::where('student_id', $student->id)
+        // ==========================================
+        // SINGLE ROW PER STUDENT / TOGGLE TIME IN & OUT
+        // ==========================================
+        
+        // Find if this student already has an entry log for today
+        $todayLog = EntryLog::where('student_id', $student->id)
             ->where('date', $today)
             ->where('status', 'granted')
-            ->whereNull('time_out')
             ->latest('id')
             ->first();
 
-        if ($openLog) {
-            $openLog->update(['time_out' => $now->format('H:i:s')]);
-            $action = 'time_out';
+        if ($todayLog) {
+            // If they already have a log for today:
+            if (is_null($todayLog->time_out)) {
+                // If they haven't timed out yet, set the time out (Time Out action)
+                $todayLog->update([
+                    'time_out' => $now->format('H:i:s')
+                ]);
+                $action = 'time_out';
+            } else {
+                // If they already completed a cycle today and tap again, 
+                // reset/update time_in to the new tap and clear time_out for a re-entry
+                $todayLog->update([
+                    'time_in'  => $now->format('H:i:s'),
+                    'time_out' => null
+                ]);
+                $action = 'time_in';
+            }
         } else {
+            // First tap of the day: Create the single daily record for this student
             EntryLog::create([
                 'student_id' => $student->id,
                 'date'       => $today,
                 'time_in'    => $now->format('H:i:s'),
+                'time_out'   => null,
                 'status'     => 'granted',
             ]);
             $action = 'time_in';

@@ -43,6 +43,7 @@ Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () 
 
 // Guard Routes (security only)
 Route::middleware(['auth', 'role:Security'])->prefix('Security')->group(function () {
+    Route::post('/Security/dashboard/reset-feed', [GuardController::class, 'resetFeed'])->name('guard.feed.reset');
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
     Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk');

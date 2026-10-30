@@ -88,9 +88,11 @@
 
                 <!-- Live Entry Feed Table -->
                 <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <h2 class="text-lg font-bold text-gray-800">Live Entry Feed</h2>
-                        <p class="text-xs text-gray-500 mt-1">Last scanned students (Real-time)</p>
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Live Entry Feed</h2>
+                            <p class="text-xs text-gray-500 mt-1">Last scanned students (Real-time)</p>
+                        </div>
                     </div>
                     
                     <!-- Scrollable Container -->
@@ -374,7 +376,7 @@
         }
      }
 
-       setInterval(refreshDashboard, 3000);   // every 3 seconds
+        setInterval(refreshDashboard, 3000);   // every 3 seconds
     </script>
 
 </body>
