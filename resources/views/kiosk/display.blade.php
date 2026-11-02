@@ -192,11 +192,18 @@
             if (granted) {
                 $('action').textContent = scan.action === 'IN' ? 'TIME IN' : 'TIME OUT';
                 $('message').textContent = scan.action === 'IN' ? 'Welcome to IETI!' : 'Have a safe trip home!';
+            } else if (scan.is_unknown) {
+                $('action').textContent = 'UNKNOWN CARD';
+                $('message').textContent = 'This RFID tag is not registered in the system.';
+            } else if (scan.is_expired || scan.reason === 'expired_card') {
+                $('action').textContent = 'EXPIRED CARD';
+                $('message').textContent = 'This temporary or visitor card has expired. Please renew it at the registrar.';
+            } else if (scan.reason === 'enrollment_not_confirmed') {
+                $('action').textContent = 'NOT ALLOWED';
+                $('message').textContent = 'Enrollment is not confirmed for the current school year.';
             } else {
-                $('action').textContent = scan.is_unknown ? 'UNKNOWN CARD' : 'NOT ALLOWED';
-                $('message').textContent = scan.is_unknown 
-                    ? 'This RFID tag is not registered in the system.' 
-                    : 'Please proceed to the registrar\'s office.';
+                $('action').textContent = 'NOT ALLOWED';
+                $('message').textContent = 'Please proceed to the registrar\'s office.';
             }
 
             // Photo / Avatar handling

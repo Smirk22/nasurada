@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\EntryLog;
 use App\Models\Student;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class GuardController extends Controller
 {
@@ -22,14 +22,34 @@ class GuardController extends Controller
 
         $today = today();
 
-        // Live feed: Show today's last scanned students (unique per student/log)
-        $entryLogs = EntryLog::whereDate('date', $today)
+        // Optional "reset" cutoff: when the guard clears the feed, only show
+        // entry logs created after the reset. We use the log ID (not the
+        // updated_at timestamp) so an existing student cannot pop back into
+        // the feed just because their same row was updated after the reset.
+        $feedResetId = session('guard_feed_reset_id');
+        $feedResetAt = session('guard_feed_reset_at');
+
+        // Upgrade a timestamp-only reset (made before ID cutoffs existed) so
+        // already-shown students stay removed even if their row is updated.
+        if ($feedResetId === null && $feedResetAt) {
+            $feedResetId = (int) EntryLog::max('id');
+            session(['guard_feed_reset_id' => $feedResetId]);
+        }
+
+        $liveFeedQuery = EntryLog::whereDate('date', $today)
             ->with('student')
             ->orderByDesc('updated_at')
-            ->orderByDesc('id')
+            ->orderByDesc('id');
+
+        if ($feedResetId !== null) {
+            $liveFeedQuery->where('id', '>', (int) $feedResetId);
+        }
+
+        // Live feed: Show today's last scanned students (unique per student/log)
+        $entryLogs = $liveFeedQuery
             ->get()
             ->unique(function ($item) {
-                return $item->student_id ? 'student_' . $item->student_id : 'log_' . $item->id;
+                return $item->student_id ? 'student_'.$item->student_id : 'log_'.$item->id;
             })
             ->take(10);
 
@@ -39,7 +59,7 @@ class GuardController extends Controller
             ->count('student_id');
 
         $entriesDenied = EntryLog::whereDate('date', $today)
-            ->whereIn('status', ['denied', 'unknown'])
+            ->whereIn('status', ['denied', 'unknown', 'expired'])
             ->count();
 
         $currentlyIn = EntryLog::whereDate('date', $today)
@@ -58,14 +78,14 @@ class GuardController extends Controller
 
         // Alerts box: the 5 most recent denied/unknown scans
         $deniedEntries = EntryLog::whereDate('date', $today)
-            ->whereIn('status', ['denied', 'unknown'])
+            ->whereIn('status', ['denied', 'unknown', 'expired'])
             ->with('student')
             ->orderByDesc('id')
             ->limit(5)
             ->get()
             ->map(fn ($log) => [
-                'time' => ($log->student ? ($log->student->first_name . ' ' . $log->student->last_name) : ('UID: ' . ($log->card_uid ?? 'Unknown')))
-                        . ' at ' . Carbon::parse($log->time_in)->format('H:i'),
+                'time' => ($log->student ? ($log->student->first_name.' '.$log->student->last_name) : ('UID: '.($log->card_uid ?? 'Unknown')))
+                    .' at '.Carbon::parse($log->time_in)->timezone(config('app.timezone'))->format('g:i A'),
             ])
             ->all();
 
@@ -84,7 +104,35 @@ class GuardController extends Controller
             'currentlyOut' => $currentlyOut,
             'deniedEntries' => $deniedEntries,
             'availableRfids' => $availableRfids,
+            'feedResetAt' => $feedResetAt,
         ]);
+    }
+
+    /**
+     * Clear or restore the live entry feed.
+     * "clear" hides the current scans (new scans still appear).
+     * "restore" removes the cutoff and shows all of today's scans again.
+     */
+    public function resetFeed(Request $request)
+    {
+        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+            abort(403);
+        }
+
+        if ($request->input('action') === 'restore') {
+            session()->forget(['guard_feed_reset_id', 'guard_feed_reset_at']);
+
+            return redirect()->route('guard.dashboard')
+                ->with('success', 'Live entry feed restored. Showing all of today\'s scans.');
+        }
+
+        session([
+            'guard_feed_reset_id' => (int) EntryLog::max('id'),
+            'guard_feed_reset_at' => now(),
+        ]);
+
+        return redirect()->route('guard.dashboard')
+            ->with('success', 'Live entry feed reset. Current students are hidden; new scans will appear here.');
     }
 
     /**
@@ -114,28 +162,31 @@ class GuardController extends Controller
             ->first();
 
         // Nothing scanned today yet
-        if (!$log) {
+        if (! $log) {
             return response()->json(['scan' => null]);
         }
 
         $student = $log->student;
         $isUnknown = is_null($student) || $log->status === 'unknown';
-        $isDenied  = !$isUnknown && $log->status === 'denied';
-        $granted   = !$isUnknown && !$isDenied;
-        $isOut     = $granted && $log->time_out !== null;
+        $isExpired = ! $isUnknown && $log->status === 'expired';
+        $isDenied = ! $isUnknown && ! $isExpired && $log->status === 'denied';
+        $granted = ! $isUnknown && ! $isDenied && ! $isExpired;
+        $isOut = $granted && $log->time_out !== null;
 
         return response()->json([
             'scan' => [
-                'key'            => $log->id . '-' . $log->updated_at->timestamp,
-                'result'         => ($isUnknown || $isDenied) ? 'denied' : 'granted',
-                'is_unknown'     => $isUnknown,
-                'card_uid'       => $log->card_uid ?? 'Unknown',
-                'action'         => $isUnknown ? 'UNKNOWN' : ($isOut ? 'OUT' : 'IN'),
-                'time'           => Carbon::parse($log->time_in)->format('h:i:s A'),
-                'name'           => $isUnknown ? 'Unregistered Tag' : ($student->first_name . ' ' . $student->last_name),
-                'student_number' => $isUnknown ? ('UID: ' . ($log->card_uid ?? 'N/A')) : $student->student_number,
-                'initial'        => $isUnknown ? '⚠️' : strtoupper(substr($student->first_name, 0, 1)),
-                'photo'          => (!$isUnknown && $student->photo) ? '/storage/' . ltrim($student->photo, '/') : null,
+                'key' => $log->id.'-'.$log->updated_at->timestamp,
+                'result' => ($isUnknown || $isDenied || $isExpired) ? 'denied' : 'granted',
+                'reason' => $log->reason,
+                'is_unknown' => $isUnknown,
+                'is_expired' => $isExpired,
+                'card_uid' => $log->card_uid ?? 'Unknown',
+                'action' => $isUnknown ? 'UNKNOWN' : ($isExpired ? 'EXPIRED' : ($isOut ? 'OUT' : 'IN')),
+                'time' => Carbon::parse($log->time_in)->format('h:i:s A'),
+                'name' => $isUnknown ? 'Unregistered Tag' : ($student->first_name.' '.$student->last_name),
+                'student_number' => $isUnknown ? ('UID: '.($log->card_uid ?? 'N/A')) : $student->student_number,
+                'initial' => $isUnknown ? '⚠️' : strtoupper(substr($student->first_name, 0, 1)),
+                'photo' => (! $isUnknown && $student->photo) ? '/storage/'.ltrim($student->photo, '/') : null,
             ],
         ]);
     }
@@ -163,10 +214,10 @@ class GuardController extends Controller
     private function generateAvailableRfids($assignedTags)
     {
         $availableTags = [];
-        
+
         for ($i = 1001; $i <= 1050; $i++) {
-            $tag = 'RFID-' . str_pad($i, 4, '0', STR_PAD_LEFT);
-            if (!in_array($tag, $assignedTags)) {
+            $tag = 'RFID-'.str_pad($i, 4, '0', STR_PAD_LEFT);
+            if (! in_array($tag, $assignedTags)) {
                 $availableTags[] = $tag;
             }
         }

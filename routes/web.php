@@ -52,13 +52,14 @@ Route::middleware(['auth', 'role:Registrar'])->group(function () {
 // Entry Logs Routes (any staff role)
 Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () {
     Route::get('/registrar/entry-logs', [EntryLogController::class, 'index'])->name('entry-logs.index');
+    Route::get('/registrar/entry-logs/summary', [EntryLogController::class, 'summary'])->name('entry-logs.summary');
     Route::get('/registrar/entry-logs/section/{section}', [EntryLogController::class, 'getBySection'])->name('entry-logs.getBySection');
     Route::post('/registrar/entry-logs', [EntryLogController::class, 'store'])->name('entry-logs.store');
 });
 
 // Guard Routes (security only)
 Route::middleware(['auth', 'role:Security'])->prefix('Security')->group(function () {
-    Route::post('/Security/dashboard/reset-feed', [GuardController::class, 'resetFeed'])->name('guard.feed.reset');
+    Route::post('/dashboard/reset-feed', [GuardController::class, 'resetFeed'])->name('guard.feed.reset');
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
     Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk');

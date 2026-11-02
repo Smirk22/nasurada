@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\EntryLog;
 use App\Models\Student;
 use Illuminate\Http\Request;
 
@@ -12,8 +13,11 @@ class RegistrarController extends Controller
     {
         $totalStudents = Student::count();
         $unassignedRfids = Student::whereNull('rfid_tag')->orWhere('rfid_tag', '')->count();
+        $entriesToday = EntryLog::whereDate('date', today())
+            ->where('status', 'granted')
+            ->count();
 
-        return view('rdashboard', compact('totalStudents', 'unassignedRfids'));
+        return view('rdashboard', compact('totalStudents', 'unassignedRfids', 'entriesToday'));
     }
 
     public function students(Request $request)
@@ -47,22 +51,22 @@ class RegistrarController extends Controller
         $validated = $request->validate([
             // Student Number - Required, Unique, Format: 3 letters + 8 numbers (e.g., MAR87654320)
             'student_number' => 'required|unique:students,student_number|regex:/^[A-Z]{3}\d{8}$/',
-            
+
             // First Name - Letters only, no numbers or special characters
             'first_name' => 'required|string|max:255|regex:/^[a-zA-Z\s\'-]+$/',
-            
+
             // Last Name - Letters only, no numbers or special characters
             'last_name' => 'required|string|max:255|regex:/^[a-zA-Z\s\'-]+$/',
-            
+
             // Course - Only BSIT allowed (pilot program)
             'course' => 'required|in:BSIT',
-            
+
             // Year Level - Only 1, 2, 3, or 4
             'year_level' => 'required|integer|in:1,2,3,4',
-            
+
             // Section - Only predefined sections
             'section' => 'required|in:S1B1,S1B2,S4B1,S7C3',
-            
+
             // RFID Tag - Optional, unique
             'rfid_tag' => 'nullable|string|unique:students,rfid_tag',
         ], [
@@ -77,6 +81,8 @@ class RegistrarController extends Controller
         ]);
 
         $validated['status'] = 'Enrolled';
+        $validated['school_year'] = Student::currentSchoolYear();
+        $validated['enrollment_confirmed'] = true;
 
         $student = Student::create($validated);
 

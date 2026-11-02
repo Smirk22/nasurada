@@ -11,10 +11,12 @@ class EntryLog extends Model
 
     protected $fillable = [
         'student_id',
+        'card_uid',
         'date',
         'time_in',
         'time_out',
         'status',
+        'reason',
     ];
 
     public function student()

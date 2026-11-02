@@ -13,22 +13,94 @@ class EntryLogController extends Controller
      */
     public function index()
     {
-        return view('registrar.entry-logs');
+        // Build the Year > Section list from the students that actually exist,
+        // so scans from the guard's live feed always land in the right bucket.
+        $sectionsByYear = Student::query()
+            ->whereNotNull('section')
+            ->where('section', '<>', '')
+            ->select('year_level', 'section')
+            ->distinct()
+            ->orderBy('year_level')
+            ->orderBy('section')
+            ->get()
+            ->groupBy('year_level')
+            ->map(fn ($rows) => $rows->pluck('section')->unique()->values());
+
+        // Always keep years 1-4 visible, in order, even when a year is empty.
+        $yearLevels = collect([1, 2, 3, 4])
+            ->merge($sectionsByYear->keys())
+            ->unique()
+            ->sort()
+            ->values()
+            ->mapWithKeys(fn ($year) => [
+                $year => $sectionsByYear->get($year, collect()),
+            ]);
+
+        $sectionCounts = $this->todayCounts();
+
+        return view('registrar.entry-logs', [
+            'yearLevels' => $yearLevels,
+            'sectionCounts' => $sectionCounts,
+            'totalToday' => array_sum($sectionCounts),
+        ]);
     }
 
     /**
-     * Get entry logs by section (API endpoint for AJAX)
+     * Get entry logs by section (API endpoint for AJAX).
+     * Optionally narrowed down by year level and date.
      */
-    public function getBySection($section)
+    public function getBySection(Request $request, $section)
     {
-        $logs = EntryLog::whereHas('student', function ($query) use ($section) {
-            $query->where('section', $section);
-        })
-        ->with('student')
-        ->orderBy('date', 'desc')
-        ->get();
+        $query = EntryLog::query()
+            ->whereHas('student', function ($query) use ($request, $section) {
+                $query->where('section', $section);
 
-        return response()->json($logs);
+                if ($request->filled('year')) {
+                    $query->where('year_level', $request->input('year'));
+                }
+            })
+            ->with('student')
+            ->orderByDesc('date')
+            ->orderByDesc('time_in')
+            ->orderByDesc('id');
+
+        if ($request->filled('date')) {
+            $query->whereDate('date', $request->input('date'));
+        }
+
+        return response()->json($query->get());
+    }
+
+    /**
+     * Today's verified entry counts grouped by "year|section".
+     * Polled by the Entry Logs page to stay in sync with the guard's live feed.
+     */
+    public function summary()
+    {
+        $counts = $this->todayCounts();
+
+        return response()->json([
+            'counts' => (object) $counts,
+            'total' => array_sum($counts),
+        ]);
+    }
+
+    /**
+     * Count of students who entered today, keyed by "year|section".
+     *
+     * @return array<string, int>
+     */
+    private function todayCounts(): array
+    {
+        return EntryLog::query()
+            ->whereDate('date', today())
+            ->where('status', 'granted')
+            ->with('student:id,year_level,section')
+            ->get()
+            ->filter(fn ($log) => $log->student !== null)
+            ->groupBy(fn ($log) => $log->student->year_level.'|'.$log->student->section)
+            ->map(fn ($logs) => $logs->count())
+            ->all();
     }
 
     /**
@@ -42,7 +114,7 @@ class EntryLogController extends Controller
 
         $student = Student::where('rfid_tag', $validated['rfid_tag'])->first();
 
-        if (!$student) {
+        if (! $student) {
             return response()->json(['error' => 'Invalid RFID tag'], 404);
         }
 
@@ -52,12 +124,13 @@ class EntryLogController extends Controller
             ->where('date', $today)
             ->first();
 
-        if (!$log) {
+        if (! $log) {
             // Create new entry (Time In)
             $log = EntryLog::create([
                 'student_id' => $student->id,
                 'date' => $today,
                 'time_in' => now()->format('H:i:s'),
+                'status' => 'granted',
             ]);
         } else {
             // Update existing entry (Time Out)

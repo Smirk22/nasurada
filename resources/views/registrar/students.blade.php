@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Records - IETI</title>
+
+    {{-- Bootstrap 5 (CDN) --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    {{-- Tailwind is still required by the shared sidebar partial --}}
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -16,279 +22,374 @@
             }
         }
     </script>
+
+    <style>
+        :root {
+            --ieti-green: #064e29;
+            --ieti-green-hover: #0a6b39;
+        }
+
+        .btn-ieti {
+            background-color: var(--ieti-green);
+            border-color: var(--ieti-green);
+            color: #fff;
+        }
+        .btn-ieti:hover,
+        .btn-ieti:focus {
+            background-color: var(--ieti-green-hover);
+            border-color: var(--ieti-green-hover);
+            color: #fff;
+        }
+
+        .table thead th {
+            white-space: nowrap;
+            font-size: .72rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #6c757d;
+        }
+
+        .table tbody tr {
+            transition: background-color .15s ease;
+        }
+
+        .rfid-code {
+            font-family: var(--bs-font-monospace);
+            font-size: .78rem;
+            letter-spacing: .02em;
+        }
+
+        .page-card {
+            border: 0;
+            border-radius: 1rem;
+            box-shadow: 0 .125rem .5rem rgba(0, 0, 0, .06);
+        }
+
+        .modal-content {
+            border: 0;
+            border-radius: 1rem;
+            box-shadow: 0 1rem 3rem rgba(0, 0, 0, .18);
+        }
+    </style>
 </head>
 <body class="bg-gray-100 font-sans min-h-screen">
 
     <div class="flex min-h-screen">
         {{-- 1. Sidebar Navigation --}}
-        @include('partials.sidebar') {{-- Update path if your sidebar is stored elsewhere (e.g. 'registrar.partials.sidebar') --}}
+        @include('partials.sidebar')
 
         {{-- 2. Main Content Area --}}
-        <main class="flex-1 p-8 space-y-6 overflow-y-auto">
+        <main class="flex-1 p-3 p-md-4 p-lg-5">
 
             @if(session('success'))
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl shadow-sm">
-                    {{ session('success') }}
+                <div class="alert alert-success d-flex align-items-center gap-2 shadow-sm" role="alert">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>{{ session('success') }}</span>
                 </div>
             @endif
 
-        <!-- Action Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow border border-gray-100">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-800">Student Records</h1>
-                <p class="text-xs text-gray-500 mt-1">Manage enrollments, edit information, assign RFID tags, or trigger semester reset.</p>
+            <!-- Action Header -->
+            <div class="card page-card mb-4">
+                <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div>
+                        <h1 class="h4 fw-bold text-dark mb-1">
+                            <i class="bi bi-people-fill text-success me-1"></i> Student Records
+                        </h1>
+                        <p class="text-muted small mb-0">Manage enrollments, edit information, assign RFID tags, or trigger semester reset.</p>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-ieti fw-semibold" data-bs-toggle="modal" data-bs-target="#addModal">
+                            <i class="bi bi-person-plus-fill me-1"></i> Add New Student
+                        </button>
+                        <form action="{{ route('registrar.students.unenrollAll') }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to end the semester? This will set ALL students to Unenrolled and clear all assigned RFID tags.');">
+                            @csrf
+                            <button type="submit" class="btn btn-outline-danger fw-semibold">
+                                <i class="bi bi-calendar-x me-1"></i> End of Semester
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button onclick="openModal('addModal')" class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
-                    + Add New Student
-                </button>
-                <form action="{{ route('registrar.students.unenrollAll') }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to end the semester? This will set ALL students to Unenrolled and clear all assigned RFID tags.');">
-                    @csrf
-                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
-                         End of Semester (Unenroll All)
-                    </button>
-                </form>
+
+            <!-- Filters & Search -->
+            <div class="card page-card mb-4">
+                <div class="card-body p-3">
+                    <form method="GET" action="{{ route('registrar.students') }}" class="row g-2 align-items-center">
+                        <div class="col-12 col-md">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
+                                <input type="text" name="search" value="{{ request('search') }}" placeholder="Search Name or Student #..." class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-8 col-md-3">
+                            <select name="year" class="form-select">
+                                <option value="All Years">All Years</option>
+                                <option value="1" {{ request('year') == '1' ? 'selected' : '' }}>Year 1</option>
+                                <option value="2" {{ request('year') == '2' ? 'selected' : '' }}>Year 2</option>
+                                <option value="3" {{ request('year') == '3' ? 'selected' : '' }}>Year 3</option>
+                                <option value="4" {{ request('year') == '4' ? 'selected' : '' }}>Year 4</option>
+                            </select>
+                        </div>
+                        <div class="col-4 col-md-auto">
+                            <button type="submit" class="btn btn-dark fw-semibold w-100">
+                                <i class="bi bi-funnel me-1"></i> Filter
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
 
-        <!-- Filters & Search -->
-        <form method="GET" action="{{ route('registrar.students') }}" class="bg-white p-4 rounded-xl shadow border border-gray-100 flex flex-col md:flex-row gap-4">
-            <input type="text" name="search" value="{{ request('search') }}" placeholder="Search Name or Student #..." class="border rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-green-600">
-            <select name="year" class="border rounded-lg px-3 py-2 text-sm">
-                <option value="All Years">All Years</option>
-                <option value="1" {{ request('year') == '1' ? 'selected' : '' }}>Year 1</option>
-                <option value="2" {{ request('year') == '2' ? 'selected' : '' }}>Year 2</option>
-                <option value="3" {{ request('year') == '3' ? 'selected' : '' }}>Year 3</option>
-                <option value="4" {{ request('year') == '4' ? 'selected' : '' }}>Year 4</option>
-            </select>
-            <button type="submit" class="bg-gray-800 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-900 transition">Filter</button>
-        </form>
+            <!-- Student Records Table -->
+            <div class="card page-card overflow-hidden">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4 py-3">Student #</th>
+                                <th class="py-3">Name</th>
+                                <th class="py-3">Course / Year / Sec</th>
+                                <th class="py-3">RFID Tag</th>
+                                <th class="py-3">Status</th>
+                                <th class="py-3 pe-4 text-end">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($students as $student)
+                                <tr>
+                                    <td class="ps-4 fw-semibold text-dark">{{ $student->student_number ?? 'N/A' }}</td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success fw-bold" style="width:34px;height:34px;">
+                                                {{ strtoupper(substr($student->first_name, 0, 1)) }}{{ strtoupper(substr($student->last_name, 0, 1)) }}
+                                            </span>
+                                            <span class="fw-medium text-dark">{{ $student->first_name }} {{ $student->last_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-secondary">{{ $student->course }} &middot; Year {{ $student->year_level }} &middot; {{ $student->section }}</td>
+                                    <td>
+                                        @if($student->rfid_tag)
+                                            <span class="badge text-bg-success rfid-code">{{ $student->rfid_tag }}</span>
+                                        @else
+                                            <span class="badge text-bg-warning">Unassigned</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill {{ $student->status === 'Enrolled' ? 'text-bg-success' : 'text-bg-danger' }}">
+                                            {{ $student->status }}
+                                        </span>
+                                    </td>
+                                    <td class="pe-4 text-end">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" onclick="editStudent({{ json_encode($student) }})" class="btn btn-sm btn-outline-primary" title="Edit / RFID">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            <form action="{{ route('registrar.students.destroy', $student->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this student permanently?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="py-5 text-center text-muted">
+                                        <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+                                        No student records found.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-        <!-- Student Records Table -->
-        <div class="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-50 border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
-                        <th class="p-4">Student #</th>
-                        <th class="p-4">Name</th>
-                        <th class="p-4">Course / Year / Sec</th>
-                        <th class="p-4">RFID Tag</th>
-                        <th class="p-4">Status</th>
-                        <th class="p-4 text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 text-sm">
-                    @forelse($students as $student)
-                        <tr class="hover:bg-gray-50 transition">
-                            <td class="p-4 font-semibold text-gray-800">{{ $student->student_number ?? 'N/A' }}</td>
-                            <td class="p-4 font-medium text-gray-900">{{ $student->first_name }} {{ $student->last_name }}</td>
-                            <td class="p-4 text-gray-600">{{ $student->course }} - {{ $student->year_level }}{{ $student->section }}</td>
-                            <td class="p-4">
-                                @if($student->rfid_tag)
-                                    <span class="bg-green-100 text-green-800 font-mono text-xs px-2 py-1 rounded-md">{{ $student->rfid_tag }}</span>
-                                @else
-                                    <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-md">Unassigned</span>
-                                @endif
-                            </td>
-                            <td class="p-4">
-                                <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $student->status === 'Enrolled' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                    {{ $student->status }}
-                                </span>
-                            </td>
-                            <td class="p-4 text-center space-x-2">
-                                <button onclick="editStudent({{ json_encode($student) }})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Edit / RFID</button>
-                                <form action="{{ route('registrar.students.destroy', $student->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this student permanently?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">Delete</button>
-                                </form>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="p-6 text-center text-gray-400 text-sm">No student records found.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-    </main>
+        </main>
+    </div>
 
     <!-- Add Student Modal -->
-    <div id="addModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Add New Student</h3>
-            <form action="{{ route('registrar.students.store') }}" method="POST" class="space-y-3" onsubmit="return validateAddForm()">
-                @csrf
-
-                <!-- Student Number -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">Student Number (Format: 3 Letters + 8 Numbers)</label>
-                    <input type="text" name="student_number" id="add_student_number" placeholder="e.g., MAR87654320" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600 uppercase">
-                    <small class="text-red-500 hidden" id="add_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</small>
-                </div>
-
-                <!-- First & Last Name -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">First Name</label>
-                        <input type="text" name="first_name" id="add_first_name" placeholder="First Name" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <small class="text-red-500 hidden" id="add_first_error">Letters only (no numbers)</small>
+    <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('registrar.students.store') }}" method="POST" onsubmit="return validateAddForm()">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="addModalLabel">Add New Student</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Last Name</label>
-                        <input type="text" name="last_name" id="add_last_name" placeholder="Last Name" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <small class="text-red-500 hidden" id="add_last_error">Letters only (no numbers)</small>
+                    <div class="modal-body">
+                        <!-- Student Number -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="add_student_number">Student Number (3 Letters + 8 Numbers)</label>
+                            <input type="text" name="student_number" id="add_student_number" placeholder="e.g., MAR87654320" required class="form-control text-uppercase">
+                            <div class="invalid-feedback d-block text-danger small hidden" id="add_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</div>
+                        </div>
+
+                        <!-- First & Last Name -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="add_first_name">First Name</label>
+                                <input type="text" name="first_name" id="add_first_name" placeholder="First Name" required class="form-control">
+                                <div class="text-danger small hidden" id="add_first_error">Letters only (no numbers)</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="add_last_name">Last Name</label>
+                                <input type="text" name="last_name" id="add_last_name" placeholder="Last Name" required class="form-control">
+                                <div class="text-danger small hidden" id="add_last_error">Letters only (no numbers)</div>
+                            </div>
+                        </div>
+
+                        <!-- Course -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="add_course">Course</label>
+                            <select name="course" id="add_course" required class="form-select">
+                                <option value="">-- Select Course --</option>
+                                <option value="BSIT">BSIT (Bachelor of Science in Information Technology)</option>
+                            </select>
+                        </div>
+
+                        <!-- Year Level & Section -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="add_year_level">Year Level</label>
+                                <select name="year_level" id="add_year_level" required class="form-select">
+                                    <option value="">-- Select Year --</option>
+                                    <option value="1">1st Year</option>
+                                    <option value="2">2nd Year</option>
+                                    <option value="3">3rd Year</option>
+                                    <option value="4">4th Year</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="add_section">Section</label>
+                                <select name="section" id="add_section" required class="form-select">
+                                    <option value="">-- Select Section --</option>
+                                    <option value="S1B1">S1B1</option>
+                                    <option value="S1B2">S1B2</option>
+                                    <option value="S4B1">S4B1</option>
+                                    <option value="S7C3">S7C3</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- RFID Tag (Optional) -->
+                        <div>
+                            <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag (Optional)</label>
+                            <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="RFID Tag Code" class="form-control">
+                        </div>
                     </div>
-                </div>
-
-                <!-- Course (Dropdown - BSIT only) -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">Course</label>
-                    <select name="course" id="add_course" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <option value="">-- Select Course --</option>
-                        <option value="BSIT">BSIT (Bachelor of Science in Information Technology)</option>
-                    </select>
-                </div>
-
-                <!-- Year Level (Dropdown - 1-4 only) -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Year Level</label>
-                        <select name="year_level" id="add_year_level" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                            <option value="">-- Select Year --</option>
-                            <option value="1">1st Year</option>
-                            <option value="2">2nd Year</option>
-                            <option value="3">3rd Year</option>
-                            <option value="4">4th Year</option>
-                        </select>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-ieti fw-semibold">Save Student</button>
                     </div>
-
-                    <!-- Section (Dropdown - predefined sections only) -->
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Section</label>
-                        <select name="section" id="add_section" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                            <option value="">-- Select Section --</option>
-                            <option value="S1B1">S1B1</option>
-                            <option value="S1B2">S1B2</option>
-                            <option value="S4B1">S4B1</option>
-                            <option value="S7C3">S7C3</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- RFID Tag (Optional) -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">RFID Tag (Optional)</label>
-                    <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="RFID Tag Code" class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                </div>
-
-                <!-- Buttons -->
-                <div class="flex justify-end space-x-2 mt-4">
-                    <button type="button" onclick="closeModal('addModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold hover:bg-green-800 transition">Save Student</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
 
     <!-- Edit Student / RFID Modal -->
-    <div id="editModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Edit Student & RFID Tag</h3>
-            <form id="editForm" method="POST" class="space-y-3" onsubmit="return validateEditForm()">
-                @csrf
-                @method('PUT')
-
-                <!-- Student Number -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">Student Number (Format: 3 Letters + 8 Numbers)</label>
-                    <input type="text" id="edit_student_number" name="student_number" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600 uppercase">
-                    <small class="text-red-500 hidden" id="edit_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</small>
-                </div>
-
-                <!-- First & Last Name -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">First Name</label>
-                        <input type="text" id="edit_first_name" name="first_name" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <small class="text-red-500 hidden" id="edit_first_error">Letters only (no numbers)</small>
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="editForm" method="POST" onsubmit="return validateEditForm()">
+                    @csrf
+                    @method('PUT')
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="editModalLabel">Edit Student &amp; RFID Tag</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Last Name</label>
-                        <input type="text" id="edit_last_name" name="last_name" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <small class="text-red-500 hidden" id="edit_last_error">Letters only (no numbers)</small>
+                    <div class="modal-body">
+                        <!-- Student Number -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="edit_student_number">Student Number (3 Letters + 8 Numbers)</label>
+                            <input type="text" id="edit_student_number" name="student_number" required class="form-control text-uppercase">
+                            <div class="text-danger small hidden" id="edit_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</div>
+                        </div>
+
+                        <!-- First & Last Name -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="edit_first_name">First Name</label>
+                                <input type="text" id="edit_first_name" name="first_name" required class="form-control">
+                                <div class="text-danger small hidden" id="edit_first_error">Letters only (no numbers)</div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="edit_last_name">Last Name</label>
+                                <input type="text" id="edit_last_name" name="last_name" required class="form-control">
+                                <div class="text-danger small hidden" id="edit_last_error">Letters only (no numbers)</div>
+                            </div>
+                        </div>
+
+                        <!-- Course -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="edit_course">Course</label>
+                            <select id="edit_course" name="course" required class="form-select">
+                                <option value="">-- Select Course --</option>
+                                <option value="BSIT">BSIT (Bachelor of Science in Information Technology)</option>
+                            </select>
+                        </div>
+
+                        <!-- Year Level & Section -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="edit_year_level">Year Level</label>
+                                <select id="edit_year_level" name="year_level" required class="form-select">
+                                    <option value="">-- Select Year --</option>
+                                    <option value="1">1st Year</option>
+                                    <option value="2">2nd Year</option>
+                                    <option value="3">3rd Year</option>
+                                    <option value="4">4th Year</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold text-secondary" for="edit_section">Section</label>
+                                <select id="edit_section" name="section" required class="form-select">
+                                    <option value="">-- Select Section --</option>
+                                    <option value="S1B1">S1B1</option>
+                                    <option value="S1B2">S1B2</option>
+                                    <option value="S4B1">S4B1</option>
+                                    <option value="S7C3">S7C3</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- RFID Tag Assignment -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="edit_rfid_tag">RFID Tag Assignment</label>
+                            <input type="text" id="edit_rfid_tag" name="rfid_tag" placeholder="Scan or enter RFID Tag" class="form-control">
+                        </div>
+
+                        <!-- Status -->
+                        <div>
+                            <label class="form-label small fw-semibold text-secondary" for="edit_status">Status</label>
+                            <select id="edit_status" name="status" required class="form-select">
+                                <option value="Enrolled">Enrolled</option>
+                                <option value="Unenrolled">Unenrolled</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
-
-                <!-- Course (Dropdown - BSIT only) -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">Course</label>
-                    <select id="edit_course" name="course" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <option value="">-- Select Course --</option>
-                        <option value="BSIT">BSIT (Bachelor of Science in Information Technology)</option>
-                    </select>
-                </div>
-
-                <!-- Year Level (Dropdown - 1-4 only) -->
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Year Level</label>
-                        <select id="edit_year_level" name="year_level" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                            <option value="">-- Select Year --</option>
-                            <option value="1">1st Year</option>
-                            <option value="2">2nd Year</option>
-                            <option value="3">3rd Year</option>
-                            <option value="4">4th Year</option>
-                        </select>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-ieti fw-semibold">Update Record</button>
                     </div>
-
-                    <!-- Section (Dropdown - predefined sections only) -->
-                    <div>
-                        <label class="text-xs text-gray-600 font-semibold block mb-1">Section</label>
-                        <select id="edit_section" name="section" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                            <option value="">-- Select Section --</option>
-                            <option value="S1B1">S1B1</option>
-                            <option value="S1B2">S1B2</option>
-                            <option value="S4B1">S4B1</option>
-                            <option value="S7C3">S7C3</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- RFID Tag Assignment -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">RFID Tag Assignment</label>
-                    <input type="text" id="edit_rfid_tag" name="rfid_tag" placeholder="Scan or enter RFID Tag" class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                </div>
-
-                <!-- Status -->
-                <div>
-                    <label class="text-xs text-gray-600 font-semibold block mb-1">Status</label>
-                    <select id="edit_status" name="status" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                        <option value="Enrolled">Enrolled</option>
-                        <option value="Unenrolled">Unenrolled</option>
-                    </select>
-                </div>
-
-                <!-- Buttons -->
-                <div class="flex justify-end space-x-2 mt-4">
-                    <button type="button" onclick="closeModal('editModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold hover:bg-green-800 transition">Update Record</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
+
+    {{-- Bootstrap JS (modals) --}}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <!-- Modal Logic & Validation -->
     <script>
         function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).show();
         }
 
         function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).hide();
         }
 
         function editStudent(student) {

@@ -4,148 +4,315 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Guard Dashboard - IETI SEVS</title>
+
+    {{-- Bootstrap 5 (CDN) --}}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    {{-- Tailwind is still required by the shared sidebar partial --}}
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ieti-green': '#064e29',
+                    }
+                }
+            }
+        }
+    </script>
+
     <style>
-        .bg-ieti-green { background-color: #064e29; }
-        .text-ieti-green { color: #064e29; }
+        :root {
+            --ieti-green: #064e29;
+            --ieti-green-hover: #0a6b39;
+        }
+
+        body {
+            background-color: #f3f4f6;
+        }
+
+        .btn-ieti {
+            background-color: var(--ieti-green);
+            border-color: var(--ieti-green);
+            color: #fff;
+        }
+        .btn-ieti:hover,
+        .btn-ieti:focus {
+            background-color: var(--ieti-green-hover);
+            border-color: var(--ieti-green-hover);
+            color: #fff;
+        }
+
+        .page-card {
+            border: 0;
+            border-radius: 1rem;
+            box-shadow: 0 .125rem .5rem rgba(0, 0, 0, .06);
+        }
+
+        .stat-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: .9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .avatar-badge {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            background-color: var(--ieti-green);
+            color: #fff;
+        }
+
+        .table thead th {
+            white-space: nowrap;
+            font-size: .72rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: #6c757d;
+        }
+
+        .table tbody tr {
+            transition: background-color .15s ease;
+        }
+
+        .feed-scroll {
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .feed-scroll thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background-color: #f8f9fa;
+        }
+
+        .photo-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: .8rem;
+        }
+        .photo-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .rfid-code {
+            font-family: var(--bs-font-monospace);
+            font-size: .78rem;
+        }
+
+        @keyframes live-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .35; transform: scale(.8); }
+        }
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #198754;
+            animation: live-pulse 1.5s ease-in-out infinite;
+        }
     </style>
 </head>
-<body class="bg-gray-100 font-sans">
+<body class="font-sans min-h-screen">
 
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         @include('partials.sidebar')
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col">
-            <!-- Top Header with Date/Time and Profile -->
-            <header class="bg-white shadow px-8 py-4 border-b border-gray-200 flex justify-between items-center">
+        <div class="flex-1 d-flex flex-column" style="min-width: 0;">
+            <!-- Top Header -->
+            <header class="bg-white shadow-sm px-4 px-lg-5 py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-800">Security Guard Dashboard</h1>
-                    <p id="dateTime" class="text-sm text-gray-500 mt-1"></p>
+                    <h1 class="h3 fw-bold text-dark mb-1">
+                        <i class="bi bi-shield-check text-success me-2"></i>Security Guard Dashboard
+                    </h1>
+                    <p id="dateTime" class="text-muted small mb-0"></p>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <div class="text-right">
-                        <p class="text-sm font-semibold text-gray-800">{{ auth()->user()->username }}</p>
-                        <p class="text-xs text-gray-500">{{ ucfirst(auth()->user()->role) }}</p>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-end">
+                        <p class="fw-semibold text-dark mb-0">{{ auth()->user()->username }}</p>
+                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">
+                            {{ ucfirst(auth()->user()->role) }}
+                        </span>
                     </div>
-                    <div class="w-10 h-10 bg-ieti-green text-white rounded-full flex items-center justify-center font-bold">
+                    <div class="avatar-badge">
                         {{ strtoupper(substr(auth()->user()->username, 0, 1)) }}
                     </div>
                 </div>
             </header>
 
             <!-- Page Content -->
-            <main class="flex-1 px-8 py-6 space-y-6 overflow-y-auto">
+            <main class="flex-1 p-3 p-md-4 p-lg-5">
 
                 @if(session('success'))
-                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl shadow-sm">
-                        {{ session('success') }}
+                    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 shadow-sm" role="alert">
+                        <i class="bi bi-check-circle-fill"></i>
+                        <span>{{ session('success') }}</span>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 @endif
 
                 <!-- Stats Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="row g-3 g-lg-4 mb-4">
                     <!-- Students Verified Today -->
-                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6 border-l-4 border-l-green-500">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Students Verified Today</p>
-                                <p id="stat-verified" class="text-3xl font-bold text-gray-800 mt-2">{{ $studentsVerifiedToday ?? 0 }}</p>
+                    <div class="col-12 col-md-4">
+                        <div class="card page-card h-100 border-start border-4 border-success">
+                            <div class="card-body d-flex align-items-center justify-content-between">
+                                <div>
+                                    <p class="text-muted small fw-semibold mb-1">Students Verified Today</p>
+                                    <p id="stat-verified" class="display-6 fw-bold text-dark mb-0">{{ $studentsVerifiedToday ?? 0 }}</p>
+                                </div>
+                                <span class="stat-icon bg-success-subtle text-success">
+                                    <i class="bi bi-person-check-fill"></i>
+                                </span>
                             </div>
-                            <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
                         </div>
                     </div>
 
                     <!-- Visitors on Campus -->
-                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6 border-l-4 border-l-blue-500">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Visitors on Campus</p>
-                                <p id="stat-visitors" class="text-3xl font-bold text-gray-800 mt-2">{{ $visitorsOnCampus ?? 0 }}</p>
+                    <div class="col-12 col-md-4">
+                        <div class="card page-card h-100 border-start border-4 border-primary">
+                            <div class="card-body d-flex align-items-center justify-content-between">
+                                <div>
+                                    <p class="text-muted small fw-semibold mb-1">Visitors on Campus</p>
+                                    <p id="stat-visitors" class="display-6 fw-bold text-dark mb-0">{{ $visitorsOnCampus ?? 0 }}</p>
+                                </div>
+                                <span class="stat-icon bg-primary-subtle text-primary">
+                                    <i class="bi bi-people-fill"></i>
+                                </span>
                             </div>
-                            <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 8.646 4 4 0 010-8.646M15 12H9m6 0a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
                         </div>
                     </div>
 
                     <!-- Entries Denied -->
-                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6 border-l-4 border-l-red-500">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm font-medium">Entries Denied</p>
-                                <p id="stat-denied" class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesDenied ?? 0 }}</p>
+                    <div class="col-12 col-md-4">
+                        <div class="card page-card h-100 border-start border-4 border-danger">
+                            <div class="card-body d-flex align-items-center justify-content-between">
+                                <div>
+                                    <p class="text-muted small fw-semibold mb-1">Entries Denied</p>
+                                    <p id="stat-denied" class="display-6 fw-bold text-dark mb-0">{{ $entriesDenied ?? 0 }}</p>
+                                </div>
+                                <span class="stat-icon bg-danger-subtle text-danger">
+                                    <i class="bi bi-shield-exclamation"></i>
+                                </span>
                             </div>
-                            <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
                         </div>
                     </div>
                 </div>
 
-                <!-- Live Entry Feed Table -->
-                <div class="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <!-- Live Entry Feed -->
+                <div class="card page-card mb-4">
+                    <div class="card-header bg-white border-bottom px-3 px-md-4 py-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                         <div>
-                            <h2 class="text-lg font-bold text-gray-800">Live Entry Feed</h2>
-                            <p class="text-xs text-gray-500 mt-1">Last scanned students (Real-time)</p>
+                            <h2 class="h5 fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                                <span class="live-dot"></span> Live Entry Feed
+                            </h2>
+                            <p class="text-muted small mb-0">Last scanned students (real-time, newest first)</p>
+                        </div>
+
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <div id="feed-meta" class="d-flex flex-wrap align-items-center gap-2">
+                                @if($feedResetAt)
+                                    <span class="badge text-bg-warning">
+                                        <i class="bi bi-funnel me-1"></i>New scans since {{ \Carbon\Carbon::parse($feedResetAt)->format('g:i A') }}
+                                    </span>
+                                    <form action="{{ route('guard.feed.reset') }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <input type="hidden" name="action" value="restore">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Show all
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+
+                            <form action="{{ route('guard.feed.reset') }}" method="POST" class="d-inline"
+                                  onsubmit="return confirm('Clear the current live entry feed? New scans will still appear.');">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-eraser me-1"></i>Reset Feed
+                                </button>
+                            </form>
                         </div>
                     </div>
-                    
-                    <!-- Scrollable Container -->
-                    <div class="max-h-[380px] overflow-y-auto">
-                        <table class="w-full text-left border-collapse relative">
-                            <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
-                                <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
-                                    <th class="p-4 bg-gray-50">Photo</th>
-                                    <th class="p-4 bg-gray-50">Name</th>
-                                    <th class="p-4 bg-gray-50">Student #</th>
-                                    <th class="p-4 bg-gray-50">Time In</th>
-                                    <th class="p-4 bg-gray-50">Time Out</th>
-                                    <th class="p-4 bg-gray-50">Status</th>
-                                    <th class="p-4 bg-gray-50">Enrollment</th>
+
+                    <div class="table-responsive feed-scroll">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-4 py-3">Photo</th>
+                                    <th class="py-3">Name</th>
+                                    <th class="py-3">Student #</th>
+                                    <th class="py-3">Time In</th>
+                                    <th class="py-3">Time Out</th>
+                                    <th class="py-3">Status</th>
+                                    <th class="py-3 pe-4">Enrollment</th>
                                 </tr>
                             </thead>
-                            <tbody id="live-feed" class="divide-y divide-gray-100 text-sm">
+                            <tbody id="live-feed">
                                 @forelse($entryLogs as $log)
                                     @php
                                         $isUnknown = is_null($log->student_id) || $log->status === 'unknown';
-                                        $isDenied = !$isUnknown && $log->status === 'denied';
-                                        $isBadScan = $isUnknown || $isDenied;
+                                        $isExpired = !$isUnknown && $log->status === 'expired';
+                                        $isDenied = !$isUnknown && !$isExpired && $log->status === 'denied';
+                                        $isBadScan = $isUnknown || $isDenied || $isExpired;
                                     @endphp
 
-                                    <tr class="{{ $isBadScan ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50' }} transition">
+                                    <tr class="{{ $isBadScan ? 'table-danger' : '' }}">
                                         <!-- Photo / Icon -->
-                                        <td class="p-4">
+                                        <td class="ps-4">
                                             @if(!$isUnknown && $log->student && $log->student->photo)
-                                                <img src="{{ asset('storage/' . ltrim($log->student->photo, '/')) }}" class="w-10 h-10 rounded-full object-cover">
+                                                <span class="photo-avatar">
+                                                    <img src="{{ asset('storage/' . ltrim($log->student->photo, '/')) }}" alt="Photo">
+                                                </span>
                                             @elseif(!$isUnknown && $log->student)
-                                                <div class="w-10 h-10 bg-ieti-green text-white rounded-full flex items-center justify-center font-bold text-xs">
+                                                <span class="photo-avatar bg-success text-white">
                                                     {{ strtoupper(substr($log->student->first_name, 0, 1)) }}
-                                                </div>
+                                                </span>
                                             @else
-                                                <div class="w-10 h-10 bg-red-600 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-sm">
-                                                    ⚠️
-                                                </div>
+                                                <span class="photo-avatar bg-danger text-white">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                                </span>
                                             @endif
                                         </td>
 
                                         <!-- Name -->
-                                        <td class="p-4 font-semibold {{ $isBadScan ? 'text-red-700' : 'text-gray-800' }}">
+                                        <td class="fw-semibold {{ $isBadScan ? 'text-danger' : 'text-dark' }}">
                                             @if($isUnknown)
                                                 Unregistered Tag
                                             @elseif($isDenied)
-                                                {{ $log->student->first_name }} {{ $log->student->last_name }} <span class="text-xs text-red-600 font-bold">(Not Enrolled)</span>
+                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
+                                                <span class="badge text-bg-danger ms-1">{{ $log->reason === 'enrollment_not_confirmed' ? 'Not Confirmed' : 'Not Enrolled' }}</span>
+                                            @elseif($isExpired)
+                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
+                                                <span class="badge text-bg-warning text-dark ms-1">Expired Card</span>
                                             @else
                                                 {{ $log->student->first_name }} {{ $log->student->last_name }}
                                             @endif
                                         </td>
 
                                         <!-- Student # or Card UID -->
-                                        <td class="p-4 {{ $isBadScan ? 'text-red-600 font-mono font-semibold' : 'text-gray-600' }}">
+                                        <td class="{{ $isBadScan ? 'text-danger rfid-code fw-semibold' : 'text-muted' }}">
                                             @if($isUnknown)
                                                 UID: {{ $log->card_uid ?? 'N/A' }}
                                             @else
@@ -154,38 +321,38 @@
                                         </td>
 
                                         <!-- Time In -->
-                                        <td class="p-4">
-                                            <span class="text-sm text-gray-800">
-                                                {{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->format('H:i') : '-' }}
-                                            </span>
+                                        <td class="text-dark">
+                                            {{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->timezone(config('app.timezone'))->format('g:i A') : '-' }}
                                         </td>
 
                                         <!-- Time Out -->
-                                        <td class="p-4">
-                                            <span class="text-sm text-gray-400">
-                                                {{ $log->time_out ? \Carbon\Carbon::parse($log->time_out)->format('H:i') : '-' }}
-                                            </span>
+                                        <td class="text-muted">
+                                            {{ $log->time_out ? \Carbon\Carbon::parse($log->time_out)->timezone(config('app.timezone'))->format('g:i A') : '-' }}
                                         </td>
 
                                         <!-- Status -->
-                                        <td class="p-4">
+                                        <td>
                                             @if($isUnknown)
-                                                <span class="px-3 py-1 bg-red-200 text-red-900 text-xs font-bold rounded-full">❌ UNKNOWN</span>
+                                                <span class="badge rounded-pill text-bg-danger">Unknown</span>
                                             @elseif($isDenied)
-                                                <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-full">⛔ DENIED</span>
+                                                <span class="badge rounded-pill text-bg-danger">Denied</span>
+                                            @elseif($isExpired)
+                                                <span class="badge rounded-pill text-bg-danger">Expired</span>
                                             @elseif($log->time_out)
-                                                <span class="px-3 py-1 bg-red-100 text-red-800 text-xs font-semibold rounded-full">🔴 OUT</span>
+                                                <span class="badge rounded-pill text-bg-warning text-dark">Out</span>
                                             @else
-                                                <span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">✅ IN</span>
+                                                <span class="badge rounded-pill text-bg-success">In</span>
                                             @endif
                                         </td>
 
-                                        <!-- Enrollment / Details -->
-                                        <td class="p-4">
+                                        <!-- Enrollment -->
+                                        <td class="pe-4">
                                             @if($isUnknown)
-                                                <span class="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full">Not in Database</span>
+                                                <span class="badge text-bg-danger">Not in Database</span>
+                                            @elseif($isExpired)
+                                                <span class="badge text-bg-warning text-dark">{{ ucfirst($log->student->card_type) }} Expired</span>
                                             @else
-                                                <span class="px-3 py-1 {{ $log->student->status === 'Enrolled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }} text-xs font-semibold rounded-full">
+                                                <span class="badge {{ $log->student->status === 'Enrolled' ? 'text-bg-primary' : 'text-bg-secondary' }}">
                                                     {{ $log->student->status }}
                                                 </span>
                                             @endif
@@ -193,7 +360,10 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="p-6 text-center text-gray-400 text-sm">No entry logs yet. Waiting for first scan...</td>
+                                        <td colspan="7" class="py-5 text-center text-muted">
+                                            <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+                                            No entry logs yet. Waiting for the first scan...
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -201,114 +371,137 @@
                     </div>
                 </div>
 
-                <!-- Register Visitor Section -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
-                        <h2 class="text-lg font-bold text-gray-800 mb-4">Register Visitor</h2>
-                        <form action="{{ route('guard.visitor.store') }}" method="POST" class="space-y-4">
-                            @csrf
-                            
-                            <!-- Full Name -->
-                            <div>
-                                <label class="text-xs text-gray-600 font-semibold block mb-1">Full Name</label>
-                                <input type="text" name="visitor_name" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="Visitor name">
-                            </div>
+                <!-- Register Visitor & Alerts -->
+                <div class="row g-3 g-lg-4">
+                    <!-- Register Visitor -->
+                    <div class="col-12 col-lg-6">
+                        <div class="card page-card h-100">
+                            <div class="card-body p-4">
+                                <h2 class="h5 fw-bold text-dark mb-3">
+                                    <i class="bi bi-person-vcard text-success me-2"></i>Register Visitor
+                                </h2>
 
-                            <!-- ID Type & Number -->
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="text-xs text-gray-600 font-semibold block mb-1">ID Type</label>
-                                    <select name="id_type" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                                        <option value="">Select ID</option>
-                                        <option value="drivers_license">Driver's License</option>
-                                        <option value="passport">Passport</option>
-                                        <option value="national_id">National ID</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-gray-600 font-semibold block mb-1">ID Number</label>
-                                    <input type="text" name="id_number" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600" placeholder="ID #">
-                                </div>
-                            </div>
+                                <form action="{{ route('guard.visitor.store') }}" method="POST" class="row g-3">
+                                    @csrf
 
-                            <!-- Visiting & Pass Duration -->
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="text-xs text-gray-600 font-semibold block mb-1">Visiting</label>
-                                    <select name="visiting_department" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                                        <option value="">Department</option>
-                                        <option value="registrar">Registrar</option>
-                                        <option value="admin">Administration</option>
-                                        <option value="faculty">Faculty</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-xs text-gray-600 font-semibold block mb-1">Pass Valid For</label>
-                                    <select name="pass_duration" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                                        <option value="1">1 hour</option>
-                                        <option value="2" selected>2 hours</option>
-                                        <option value="4">4 hours</option>
-                                        <option value="8">8 hours</option>
-                                    </select>
-                                </div>
-                            </div>
+                                    <!-- Full Name -->
+                                    <div class="col-12">
+                                        <label class="form-label small fw-semibold text-secondary" for="visitor_name">Full Name</label>
+                                        <input type="text" name="visitor_name" id="visitor_name" required
+                                               class="form-control" placeholder="Visitor name">
+                                    </div>
 
-                            <!-- Available RFID Tag -->
-                            <div>
-                                <label class="text-xs text-gray-600 font-semibold block mb-1">Assign RFID Tag</label>
-                                <select name="rfid_tag" required class="w-full border p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                                    <option value="">-- Select Available RFID --</option>
-                                    @foreach($availableRfids as $rfid)
-                                        <option value="{{ $rfid }}">{{ $rfid }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                                    <!-- ID Type & Number -->
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold text-secondary" for="id_type">ID Type</label>
+                                        <select name="id_type" id="id_type" required class="form-select">
+                                            <option value="">Select ID</option>
+                                            <option value="drivers_license">Driver's License</option>
+                                            <option value="passport">Passport</option>
+                                            <option value="national_id">National ID</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold text-secondary" for="id_number">ID Number</label>
+                                        <input type="text" name="id_number" id="id_number" required
+                                               class="form-control" placeholder="ID #">
+                                    </div>
 
-                            <!-- Buttons -->
-                            <div class="flex gap-2 pt-2">
-                                <button type="submit" class="flex-1 bg-ieti-green hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-                                    Issue Visitor Pass
-                                </button>
-                                <button type="reset" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold transition">
-                                    Clear
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                                    <!-- Visiting & Pass Duration -->
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold text-secondary" for="visiting_department">Visiting</label>
+                                        <select name="visiting_department" id="visiting_department" required class="form-select">
+                                            <option value="">Department</option>
+                                            <option value="registrar">Registrar</option>
+                                            <option value="admin">Administration</option>
+                                            <option value="faculty">Faculty</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label small fw-semibold text-secondary" for="pass_duration">Pass Valid For</label>
+                                        <select name="pass_duration" id="pass_duration" required class="form-select">
+                                            <option value="1">1 hour</option>
+                                            <option value="2" selected>2 hours</option>
+                                            <option value="4">4 hours</option>
+                                            <option value="8">8 hours</option>
+                                        </select>
+                                    </div>
 
-                    <!-- Alerts Section -->
-                    <div id="alerts-list" class="space-y-3">
-                        <div class="bg-white rounded-xl shadow border border-gray-100 p-6 border-l-4 border-l-red-500">
-                            <h2 class="text-lg font-bold text-gray-800 mb-4">⚠️ Alerts</h2>
-                            <div class="space-y-3">
-                                @if($deniedEntries && count($deniedEntries) > 0)
-                                    @foreach($deniedEntries as $denied)
-                                        <div class="bg-red-50 border-l-4 border-red-500 p-3 rounded">
-                                            <p class="text-sm font-semibold text-red-800">❌ Invalid RFID Detected</p>
-                                            <p class="text-xs text-red-600 mt-1">{{ $denied['time'] ?? 'N/A' }}</p>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <p class="text-gray-400 text-sm">✅ All systems normal. No alerts.</p>
-                                @endif
+                                    <!-- Available RFID Tag -->
+                                    <div class="col-12">
+                                        <label class="form-label small fw-semibold text-secondary" for="rfid_tag">Assign RFID Tag</label>
+                                        <select name="rfid_tag" id="rfid_tag" required class="form-select">
+                                            <option value="">-- Select Available RFID --</option>
+                                            @foreach($availableRfids as $rfid)
+                                                <option value="{{ $rfid }}">{{ $rfid }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <!-- Buttons -->
+                                    <div class="col-12 d-flex gap-2 pt-1">
+                                        <button type="submit" class="btn btn-ieti fw-semibold flex-fill">
+                                            <i class="bi bi-check2-circle me-1"></i>Issue Visitor Pass
+                                        </button>
+                                        <button type="reset" class="btn btn-outline-secondary fw-semibold flex-fill">
+                                            Clear
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Quick Stats -->
-                        <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
-                            <h2 class="text-lg font-bold text-gray-800 mb-4">📊 Today's Summary</h2>
-                            <div id="summary-box" class="space-y-2">
-                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span class="text-sm text-gray-700">Total Entries</span>
-                                    <span class="font-bold text-lg text-ieti-green">{{ $totalEntries ?? 0 }}</span>
+                    <!-- Alerts & Today's Summary -->
+                    <div class="col-12 col-lg-6">
+                        <div id="alerts-list" class="d-flex flex-column gap-3 h-100">
+                            <!-- Alerts -->
+                            <div class="card page-card border-start border-4 border-danger">
+                                <div class="card-body p-4">
+                                    <h2 class="h5 fw-bold text-dark mb-3">
+                                        <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Alerts
+                                    </h2>
+                                    <div class="d-flex flex-column gap-2">
+                                        @if($deniedEntries && count($deniedEntries) > 0)
+                                            @foreach($deniedEntries as $denied)
+                                                <div class="alert alert-danger py-2 px-3 mb-0 d-flex align-items-start gap-2">
+                                                    <i class="bi bi-x-circle-fill mt-1"></i>
+                                                    <div>
+                                                        <p class="fw-semibold mb-0 small">Invalid RFID Detected</p>
+                                                        <p class="mb-0 small">{{ $denied['time'] ?? 'N/A' }}</p>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        @else
+                                            <p class="text-muted small mb-0">
+                                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                                All systems normal. No alerts.
+                                            </p>
+                                        @endif
+                                    </div>
                                 </div>
-                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span class="text-sm text-gray-700">Currently In</span>
-                                    <span class="font-bold text-lg text-green-600">{{ $currentlyIn ?? 0 }}</span>
-                                </div>
-                                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                    <span class="text-sm text-gray-700">Currently Out</span>
-                                    <span class="font-bold text-lg text-red-600">{{ $currentlyOut ?? 0 }}</span>
+                            </div>
+
+                            <!-- Quick Stats -->
+                            <div class="card page-card">
+                                <div class="card-body p-4">
+                                    <h2 class="h5 fw-bold text-dark mb-3">
+                                        <i class="bi bi-bar-chart-fill text-success me-2"></i>Today's Summary
+                                    </h2>
+                                    <div id="summary-box" class="d-flex flex-column gap-2">
+                                        <div class="d-flex justify-content-between align-items-center bg-light rounded-3 px-3 py-2">
+                                            <span class="text-muted small">Total Entries</span>
+                                            <span class="fw-bold fs-5 text-success">{{ $totalEntries ?? 0 }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center bg-light rounded-3 px-3 py-2">
+                                            <span class="text-muted small">Currently In</span>
+                                            <span class="fw-bold fs-5 text-success">{{ $currentlyIn ?? 0 }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center bg-light rounded-3 px-3 py-2">
+                                            <span class="text-muted small">Currently Out</span>
+                                            <span class="fw-bold fs-5 text-danger">{{ $currentlyOut ?? 0 }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -319,14 +512,16 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <!-- Display Current Date/Time -->
     <script>
         function updateDateTime() {
             const now = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
@@ -336,45 +531,45 @@
         }
 
         updateDateTime();
-        setInterval(updateDateTime, 1000); // Update every second
+        setInterval(updateDateTime, 1000);
     </script>
 
     <script>
-     const refreshIds = [
-        'stat-verified', 'stat-visitors', 'stat-denied',
-        'live-feed', 'alerts-list', 'summary-box'
-     ];
+        const refreshIds = [
+            'stat-verified', 'stat-visitors', 'stat-denied',
+            'feed-meta', 'live-feed', 'alerts-list', 'summary-box'
+        ];
 
-     async function refreshDashboard() {
-        if (document.hidden) return;   // skip while the tab isn't visible
+        async function refreshDashboard() {
+            if (document.hidden) return;   // skip while the tab isn't visible
 
-        try {
-            const res = await fetch(window.location.href, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                cache: 'no-store'
-            });
+            try {
+                const res = await fetch(window.location.href, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    cache: 'no-store'
+                });
 
-            // Session expired: the server redirected to the login page
-            if (res.redirected) {
-                window.location.reload();
-                return;
-            }
-            if (!res.ok) return;
-
-            const html = await res.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-
-            refreshIds.forEach(id => {
-                const fresh = doc.getElementById(id);
-                const current = document.getElementById(id);
-                if (fresh && current) {
-                    current.innerHTML = fresh.innerHTML;
+                // Session expired: the server redirected to the login page
+                if (res.redirected) {
+                    window.location.reload();
+                    return;
                 }
-            });
-        } catch (e) {
-            // network hiccup: try again on the next tick
+                if (!res.ok) return;
+
+                const html = await res.text();
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                refreshIds.forEach(id => {
+                    const fresh = doc.getElementById(id);
+                    const current = document.getElementById(id);
+                    if (fresh && current) {
+                        current.innerHTML = fresh.innerHTML;
+                    }
+                });
+            } catch (e) {
+                // network hiccup: try again on the next tick
+            }
         }
-     }
 
         setInterval(refreshDashboard, 3000);   // every 3 seconds
     </script>

@@ -70,7 +70,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-500 text-sm font-medium">Entries Today</p>
-                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $entriestoday ?? 0 }}</p>
+                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesToday ?? 0 }}</p>
                             </div>
                             <div class="bg-green-100 p-4 rounded-lg">
                                 <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

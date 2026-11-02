@@ -4,62 +4,42 @@ namespace App\Http\Controllers;
 
 use App\Models\EntryLog;
 use App\Models\Student;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class RfidController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'uid' => 'required|string|max:32',
         ]);
 
-        // Remove ALL whitespace and uppercase, so "BB 42 04 23" becomes "BB420423"
         $uid = strtoupper(preg_replace('/\s+/', '', $request->uid));
 
-        // Matches regardless of case or spaces stored in rfid_tag
         $student = Student::whereRaw("UPPER(REPLACE(rfid_tag, ' ', '')) = ?", [$uid])->first();
 
-        $now   = now();
+        $now = now();
         $today = $now->toDateString();
 
-        if (!$student) {
-            // Log the unknown/unregistered card so it shows up in the live feed
-            EntryLog::create([
-                'student_id' => null, 
-                'card_uid'   => $request->uid, 
-                'date'       => $today,
-                'time_in'    => $now->format('H:i:s'),
-                'status'     => 'unknown', 
-            ]);
-
-            return response()->json([
-                'status'  => 'unknown_card',
-                'message' => 'Unregistered RFID tag detected',
-                'uid'     => $uid
-            ], 404);
+        if (! $student) {
+            return $this->reject($uid, 'unknown_card', 'Unregistered RFID tag detected', 404, $now, $today, null, 'unknown');
         }
 
-        // Unenrolled or graduated students are denied and logged
         if ($student->status !== 'Enrolled') {
-            EntryLog::create([
-                'student_id' => $student->id,
-                'date'       => $today,
-                'time_in'    => $now->format('H:i:s'),
-                'status'     => 'denied',
-            ]);
-
-            return response()->json([
-                'status'  => 'denied',
-                'student' => $student->first_name . ' ' . $student->last_name,
-            ], 403);
+            return $this->reject($uid, 'enrollment_not_confirmed', 'Student is not enrolled for the current school year', 403, $now, $today, $student, 'denied');
         }
 
-        // ==========================================
-        // SINGLE ROW PER STUDENT / TOGGLE TIME IN & OUT
-        // ==========================================
-        
-        // Find if this student already has an entry log for today
+        if (! $student->enrollment_confirmed || $student->school_year !== Student::currentSchoolYear()) {
+            return $this->reject($uid, 'enrollment_not_confirmed', 'Enrollment is not confirmed for the current school year', 403, $now, $today, $student, 'denied');
+        }
+
+        if ($student->valid_until && Carbon::parse($student->valid_until)->lt(today())) {
+            return $this->reject($uid, 'expired_card', 'This temporary/visitor card has expired', 403, $now, $today, $student, 'expired');
+        }
+
         $todayLog = EntryLog::where('student_id', $student->id)
             ->where('date', $today)
             ->where('status', 'granted')
@@ -67,38 +47,62 @@ class RfidController extends Controller
             ->first();
 
         if ($todayLog) {
-            // If they already have a log for today:
             if (is_null($todayLog->time_out)) {
-                // If they haven't timed out yet, set the time out (Time Out action)
                 $todayLog->update([
-                    'time_out' => $now->format('H:i:s')
+                    'time_out' => $now->format('H:i:s'),
                 ]);
                 $action = 'time_out';
             } else {
-                // If they already completed a cycle today and tap again, 
-                // reset/update time_in to the new tap and clear time_out for a re-entry
                 $todayLog->update([
-                    'time_in'  => $now->format('H:i:s'),
-                    'time_out' => null
+                    'time_in' => $now->format('H:i:s'),
+                    'time_out' => null,
                 ]);
                 $action = 'time_in';
             }
         } else {
-            // First tap of the day: Create the single daily record for this student
             EntryLog::create([
                 'student_id' => $student->id,
-                'date'       => $today,
-                'time_in'    => $now->format('H:i:s'),
-                'time_out'   => null,
-                'status'     => 'granted',
+                'card_uid' => $uid,
+                'date' => $today,
+                'time_in' => $now->format('H:i:s'),
+                'time_out' => null,
+                'status' => 'granted',
             ]);
             $action = 'time_in';
         }
 
         return response()->json([
-            'status'  => 'success',
-            'action'  => $action,
-            'student' => $student->first_name . ' ' . $student->last_name,
+            'status' => 'success',
+            'action' => $action,
+            'student' => $student->first_name.' '.$student->last_name,
         ]);
+    }
+
+    private function reject(
+        string $uid,
+        string $reason,
+        string $message,
+        int $httpStatus,
+        CarbonInterface $now,
+        string $today,
+        ?Student $student = null,
+        string $logStatus = 'denied'
+    ): JsonResponse {
+        EntryLog::create([
+            'student_id' => $student?->id,
+            'card_uid' => $uid,
+            'date' => $today,
+            'time_in' => $now->format('H:i:s'),
+            'status' => $logStatus,
+            'reason' => $reason,
+        ]);
+
+        return response()->json([
+            'status' => $reason,
+            'reason' => $reason,
+            'message' => $message,
+            'uid' => $uid,
+            'student' => $student ? $student->first_name.' '.$student->last_name : null,
+        ], $httpStatus);
     }
 }
