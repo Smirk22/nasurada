@@ -70,7 +70,7 @@
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-gray-500 text-sm font-medium">Entries Today</p>
-                                <p class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesToday ?? 0 }}</p>
+                                <p id="entries-today-count" class="text-3xl font-bold text-gray-800 mt-2">{{ $entriesToday ?? 0 }}</p>
                             </div>
                             <div class="bg-green-100 p-4 rounded-lg">
                                 <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,6 +97,33 @@
                     </div>
                 </div>
 
-                
+                <script>
+                    const entriesTodayCount = document.getElementById('entries-today-count');
+
+                    async function refreshEntriesToday() {
+                        if (document.hidden) return;
+
+                        try {
+                            const response = await fetch('{{ route('entry-logs.summary') }}', {
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                cache: 'no-store'
+                            });
+
+                            if (!response.ok) return;
+
+                            const data = await response.json();
+
+                            if (entriesTodayCount && typeof data.total !== 'undefined') {
+                                entriesTodayCount.textContent = data.total;
+                            }
+                        } catch (error) {
+                            // Ignore network hiccups; the next poll will retry.
+                        }
+                    }
+
+                    refreshEntriesToday();
+                    setInterval(refreshEntriesToday, 3000);
+                </script>
+
 </body>
 </html>
