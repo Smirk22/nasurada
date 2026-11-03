@@ -70,7 +70,7 @@
             <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
                 <span class="text-xs font-semibold text-gray-500 uppercase">Invalid RFID Scans</span>
                 <div class="text-3xl font-extrabold text-red-600 mt-1">{{ $invalidRfidScans }}</div>
-                <span class="text-xs text-red-600 mt-1 font-medium">Security Alerts Logged</span>
+                <span class="text-xs text-red-600 mt-1 font-medium">Security Alerts Logged Today</span>
             </div>
         </div>
 

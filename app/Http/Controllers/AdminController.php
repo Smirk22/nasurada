@@ -15,7 +15,9 @@ class AdminController extends Controller
     {
         $totalUsers = User::count();
         $totalStudents = Student::count();
-        $invalidRfidScans = Incident::count();
+        $invalidRfidScans = EntryLog::whereDate('date', today())
+            ->whereIn('status', ['denied', 'unknown', 'expired'])
+            ->count();
         $users = User::all();
         $activities = ActivityLog::latest()->get();
 
