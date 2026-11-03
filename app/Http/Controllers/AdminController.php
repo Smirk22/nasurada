@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
-use App\Models\Incident;
+use App\Models\EntryLog;
 use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;

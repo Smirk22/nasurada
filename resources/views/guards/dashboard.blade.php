@@ -118,6 +118,62 @@
             font-size: .78rem;
         }
 
+        .rfid-picker {
+            position: relative;
+        }
+
+        .rfid-dropdown {
+            position: absolute;
+            top: calc(100% + .25rem);
+            left: 0;
+            right: 0;
+            z-index: 1060;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: .5rem;
+            box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .15);
+            overflow: hidden;
+        }
+
+        .rfid-list {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .rfid-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: .55rem .75rem;
+            border: 0;
+            border-bottom: 1px solid #f1f3f5;
+            background: transparent;
+            color: #212529;
+            font-family: var(--bs-font-monospace);
+            font-size: .82rem;
+            text-align: left;
+        }
+
+        .rfid-option:last-child {
+            border-bottom: 0;
+        }
+
+        .rfid-option:hover,
+        .rfid-option:focus,
+        .rfid-option.selected {
+            background: #eef7f1;
+            color: var(--ieti-green);
+            outline: none;
+        }
+
+        .rfid-empty {
+            padding: .75rem;
+            color: #6c757d;
+            font-size: .82rem;
+            text-align: center;
+        }
+
         @keyframes live-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: .35; transform: scale(.8); }
@@ -381,7 +437,7 @@
                                     <i class="bi bi-person-vcard text-success me-2"></i>Register Visitor
                                 </h2>
 
-                                <form action="{{ route('guard.visitor.store') }}" method="POST" class="row g-3">
+                                <form id="visitorForm" action="{{ route('guard.visitor.store') }}" method="POST" class="row g-3">
                                     @csrf
 
                                     <!-- Full Name -->
@@ -428,14 +484,24 @@
                                     </div>
 
                                     <!-- Available RFID Tag -->
-                                    <div class="col-12">
-                                        <label class="form-label small fw-semibold text-secondary" for="rfid_tag">Assign RFID Tag</label>
-                                        <select name="rfid_tag" id="rfid_tag" required class="form-select">
-                                            <option value="">-- Select Available RFID --</option>
-                                            @foreach($availableRfids as $rfid)
-                                                <option value="{{ $rfid }}">{{ $rfid }}</option>
-                                            @endforeach
-                                        </select>
+                                    <div class="col-12 rfid-picker">
+                                        <label class="form-label small fw-semibold text-secondary" for="visitor_rfid_tag">Assign RFID Tag</label>
+                                        <div class="input-group">
+                                            <input type="text" name="rfid_tag" id="visitor_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off" required>
+                                            <button type="button" class="btn btn-outline-secondary" id="visitor_rfid_toggle" aria-label="Show available RFID tags">
+                                                <i class="bi bi-chevron-down"></i>
+                                            </button>
+                                        </div>
+                                        <div class="rfid-dropdown d-none" id="visitor_rfid_dropdown">
+                                            <div class="p-2 border-bottom bg-light">
+                                                <button type="button" class="btn btn-ieti btn-sm w-100 fw-semibold" id="scan_visitor_rfid_btn">
+                                                    <i class="bi bi-upc-scan me-1"></i> Scan an RFID
+                                                </button>
+                                                <input type="text" id="scan_visitor_rfid_input" class="form-control form-control-sm mt-2 d-none" placeholder="Scan the card or type the tag, then press Enter" autocomplete="off">
+                                                <div class="small text-muted mt-1 d-none" id="scan_visitor_rfid_hint">Waiting for an RFID scan...</div>
+                                            </div>
+                                            <div class="rfid-list" id="visitor_rfid_list"></div>
+                                        </div>
                                     </div>
 
                                     <!-- Buttons -->
@@ -532,6 +598,128 @@
 
         updateDateTime();
         setInterval(updateDateTime, 1000);
+    </script>
+
+    <!-- Visitor RFID Picker -->
+    <script>
+        const visitorRfidInput = document.getElementById('visitor_rfid_tag');
+        const visitorRfidToggle = document.getElementById('visitor_rfid_toggle');
+        const visitorRfidDropdown = document.getElementById('visitor_rfid_dropdown');
+        const visitorRfidList = document.getElementById('visitor_rfid_list');
+        const scanVisitorRfidBtn = document.getElementById('scan_visitor_rfid_btn');
+        const scanVisitorRfidInput = document.getElementById('scan_visitor_rfid_input');
+        const scanVisitorRfidHint = document.getElementById('scan_visitor_rfid_hint');
+
+        const visitorAvailableRfids = @json($availableRfids ?? []);
+        let visitorSelectedRfid = '';
+
+        function renderVisitorRfidList() {
+            visitorRfidList.innerHTML = '';
+
+            if (visitorAvailableRfids.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'rfid-empty';
+                empty.textContent = 'No available RFID tags. Scan one to add it here.';
+                visitorRfidList.appendChild(empty);
+                return;
+            }
+
+            visitorAvailableRfids.forEach(function (tag) {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'rfid-option' + (tag === visitorSelectedRfid ? ' selected' : '');
+
+                const label = document.createElement('span');
+                label.textContent = tag;
+                option.appendChild(label);
+
+                if (tag === visitorSelectedRfid) {
+                    const check = document.createElement('i');
+                    check.className = 'bi bi-check2-circle';
+                    option.appendChild(check);
+                }
+
+                option.addEventListener('click', function () {
+                    selectVisitorRfid(tag);
+                });
+
+                visitorRfidList.appendChild(option);
+            });
+        }
+
+        function selectVisitorRfid(tag) {
+            visitorSelectedRfid = tag;
+            visitorRfidInput.value = tag;
+            renderVisitorRfidList();
+            closeVisitorRfidDropdown();
+        }
+
+        function openVisitorRfidDropdown() {
+            visitorRfidDropdown.classList.remove('d-none');
+            renderVisitorRfidList();
+        }
+
+        function closeVisitorRfidDropdown() {
+            visitorRfidDropdown.classList.add('d-none');
+            scanVisitorRfidInput.classList.add('d-none');
+            scanVisitorRfidHint.classList.add('d-none');
+        }
+
+        visitorRfidInput.addEventListener('click', openVisitorRfidDropdown);
+        visitorRfidToggle.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            if (visitorRfidDropdown.classList.contains('d-none')) {
+                openVisitorRfidDropdown();
+            } else {
+                closeVisitorRfidDropdown();
+            }
+        });
+
+        scanVisitorRfidBtn.addEventListener('click', function () {
+            scanVisitorRfidInput.value = '';
+            scanVisitorRfidInput.classList.remove('d-none');
+            scanVisitorRfidHint.classList.remove('d-none');
+            scanVisitorRfidInput.focus();
+        });
+
+        scanVisitorRfidInput.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+
+            const tag = scanVisitorRfidInput.value.replace(/\s+/g, '').toUpperCase();
+
+            if (!tag) {
+                return;
+            }
+
+            if (!visitorAvailableRfids.includes(tag)) {
+                visitorAvailableRfids.unshift(tag);
+            }
+
+            visitorSelectedRfid = tag;
+            visitorRfidInput.value = tag;
+            scanVisitorRfidInput.value = '';
+            scanVisitorRfidInput.classList.add('d-none');
+            scanVisitorRfidHint.classList.add('d-none');
+            visitorRfidList.scrollTop = 0;
+            renderVisitorRfidList();
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!visitorRfidDropdown.classList.contains('d-none') && !event.target.closest('.rfid-picker')) {
+                closeVisitorRfidDropdown();
+            }
+        });
+
+        document.getElementById('visitorForm').addEventListener('reset', function () {
+            visitorSelectedRfid = '';
+            closeVisitorRfidDropdown();
+            renderVisitorRfidList();
+        });
     </script>
 
     <script>
