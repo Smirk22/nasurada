@@ -45,6 +45,7 @@ Route::middleware(['auth', 'role:Registrar'])->group(function () {
     Route::get('/registrar/students', [RegistrarController::class, 'students'])->name('registrar.students');
     Route::post('/registrar/students', [RegistrarController::class, 'store'])->name('registrar.students.store');
     Route::put('/registrar/students/{student}', [RegistrarController::class, 'update'])->name('registrar.students.update');
+    Route::post('/registrar/students/{student}/photo', [RegistrarController::class, 'updatePhoto'])->name('registrar.students.photo');
     Route::delete('/registrar/students/{student}', [RegistrarController::class, 'destroy'])->name('registrar.students.destroy');
     Route::post('/registrar/students/unenroll-all', [RegistrarController::class, 'unenrollAll'])->name('registrar.students.unenrollAll');
 });

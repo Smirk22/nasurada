@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\EntryLog;
 use App\Models\Student;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class RegistrarController extends Controller
 {
@@ -43,7 +45,28 @@ class RegistrarController extends Controller
 
         $students = $query->get();
 
-        return view('registrar.students', compact('students'));
+        $assignedRfids = Student::pluck('rfid_tag')->filter()->toArray();
+        $availableRfids = $this->generateAvailableRfids($assignedRfids);
+
+        return view('registrar.students', compact('students', 'availableRfids'));
+    }
+
+    /**
+     * Generate the pool of RFID tags that are not assigned to any student.
+     */
+    private function generateAvailableRfids(array $assignedTags): array
+    {
+        $availableTags = [];
+
+        for ($i = 1001; $i <= 1050; $i++) {
+            $tag = 'RFID-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT);
+
+            if (! in_array($tag, $assignedTags, true)) {
+                $availableTags[] = $tag;
+            }
+        }
+
+        return $availableTags;
     }
 
     public function store(Request $request)
@@ -124,6 +147,56 @@ class RegistrarController extends Controller
         );
 
         return redirect()->back()->with('success', 'Student record updated!');
+    }
+
+    public function updatePhoto(Request $request, Student $student): RedirectResponse
+    {
+        $request->validate([
+            'photo' => 'required|file|max:2048',
+        ], [
+            'photo.required' => 'Please choose a photo to upload.',
+            'photo.file' => 'The uploaded photo is not a valid file.',
+            'photo.max' => 'The photo must not be larger than 2 MB.',
+        ]);
+
+        $file = $request->file('photo');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $imageInfo = @getimagesize($file->getRealPath());
+
+        if (! in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true) || ! $imageInfo) {
+            return redirect()->back()->withErrors([
+                'photo' => 'The photo must be a valid JPG, JPEG, PNG, or WebP image.',
+            ]);
+        }
+
+        $directory = storage_path('app/public/student-photos');
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        if ($student->photo) {
+            $oldPath = storage_path('app/public/'.$student->photo);
+
+            if (is_file($oldPath)) {
+                @unlink($oldPath);
+            }
+        }
+
+        $filename = Str::random(40).'.'.$extension;
+
+        $file->move($directory, $filename);
+
+        $student->update([
+            'photo' => 'student-photos/'.$filename,
+        ]);
+
+        ActivityLog::log(
+            'Updated Student Photo',
+            "Updated photo for {$student->first_name} {$student->last_name} ({$student->student_number})"
+        );
+
+        return redirect()->back()->with('success', 'Student photo updated!');
     }
 
     public function destroy(Student $student)

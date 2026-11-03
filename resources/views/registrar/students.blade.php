@@ -70,6 +70,62 @@
             border-radius: 1rem;
             box-shadow: 0 1rem 3rem rgba(0, 0, 0, .18);
         }
+
+        .rfid-picker {
+            position: relative;
+        }
+
+        .rfid-dropdown {
+            position: absolute;
+            top: calc(100% + .25rem);
+            left: 0;
+            right: 0;
+            z-index: 1060;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: .5rem;
+            box-shadow: 0 .5rem 1.5rem rgba(0, 0, 0, .15);
+            overflow: hidden;
+        }
+
+        .rfid-list {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .rfid-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: .55rem .75rem;
+            border: 0;
+            border-bottom: 1px solid #f1f3f5;
+            background: transparent;
+            color: #212529;
+            font-family: var(--bs-font-monospace);
+            font-size: .82rem;
+            text-align: left;
+        }
+
+        .rfid-option:last-child {
+            border-bottom: 0;
+        }
+
+        .rfid-option:hover,
+        .rfid-option:focus,
+        .rfid-option.selected {
+            background: #eef7f1;
+            color: var(--ieti-green);
+            outline: none;
+        }
+
+        .rfid-empty {
+            padding: .75rem;
+            color: #6c757d;
+            font-size: .82rem;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans min-h-screen">
@@ -85,6 +141,13 @@
                 <div class="alert alert-success d-flex align-items-center gap-2 shadow-sm" role="alert">
                     <i class="bi bi-check-circle-fill"></i>
                     <span>{{ session('success') }}</span>
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="alert alert-danger d-flex align-items-center gap-2 shadow-sm" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>{{ $errors->first() }}</span>
                 </div>
             @endif
 
@@ -159,9 +222,13 @@
                                     <td class="ps-4 fw-semibold text-dark">{{ $student->student_number ?? 'N/A' }}</td>
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
-                                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success fw-bold" style="width:34px;height:34px;">
-                                                {{ strtoupper(substr($student->first_name, 0, 1)) }}{{ strtoupper(substr($student->last_name, 0, 1)) }}
-                                            </span>
+                                            @if($student->photo)
+                                                <img src="{{ asset('storage/' . ltrim($student->photo, '/')) }}" alt="{{ $student->first_name }} {{ $student->last_name }}" class="rounded-circle object-fit-cover" style="width:34px;height:34px;">
+                                            @else
+                                                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success-subtle text-success fw-bold" style="width:34px;height:34px;">
+                                                    {{ strtoupper(substr($student->first_name, 0, 1)) }}{{ strtoupper(substr($student->last_name, 0, 1)) }}
+                                                </span>
+                                            @endif
                                             <span class="fw-medium text-dark">{{ $student->first_name }} {{ $student->last_name }}</span>
                                         </div>
                                     </td>
@@ -174,9 +241,18 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <span class="badge rounded-pill {{ $student->status === 'Enrolled' ? 'text-bg-success' : 'text-bg-danger' }}">
-                                            {{ $student->status }}
-                                        </span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge rounded-pill {{ $student->status === 'Enrolled' ? 'text-bg-success' : 'text-bg-danger' }}">
+                                                {{ $student->status }}
+                                            </span>
+                                            <form action="{{ route('registrar.students.photo', $student->id) }}" method="POST" enctype="multipart/form-data" class="d-inline">
+                                                @csrf
+                                                <input type="file" name="photo" id="photo_{{ $student->id }}" accept="image/*" class="d-none" onchange="this.form.submit()">
+                                                <label for="photo_{{ $student->id }}" class="btn btn-sm btn-outline-secondary mb-0" title="Insert photo">
+                                                    <i class="bi bi-camera"></i>
+                                                </label>
+                                            </form>
+                                        </div>
                                     </td>
                                     <td class="pe-4 text-end">
                                         <div class="d-inline-flex gap-1">
@@ -275,9 +351,24 @@
                         </div>
 
                         <!-- RFID Tag (Optional) -->
-                        <div>
+                        <div class="rfid-picker">
                             <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag (Optional)</label>
-                            <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="RFID Tag Code" class="form-control">
+                            <div class="input-group">
+                                <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off" readonly>
+                                <button type="button" class="btn btn-outline-secondary" id="add_rfid_toggle" aria-label="Show available RFID tags">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="rfid-dropdown d-none" id="add_rfid_dropdown">
+                                <div class="p-2 border-bottom bg-light">
+                                    <button type="button" class="btn btn-ieti btn-sm w-100 fw-semibold" id="scan_rfid_btn">
+                                        <i class="bi bi-upc-scan me-1"></i> Scan an RFID
+                                    </button>
+                                    <input type="text" id="scan_rfid_input" class="form-control form-control-sm mt-2 d-none" placeholder="Scan the card or type the tag, then press Enter" autocomplete="off">
+                                    <div class="small text-muted mt-1 d-none" id="scan_rfid_hint">Waiting for an RFID scan...</div>
+                                </div>
+                                <div class="rfid-list" id="add_rfid_list"></div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -391,6 +482,122 @@
         function closeModal(id) {
             bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).hide();
         }
+
+        // RFID picker for the Add Student modal
+        const addRfidInput = document.getElementById('add_rfid_tag');
+        const addRfidToggle = document.getElementById('add_rfid_toggle');
+        const addRfidDropdown = document.getElementById('add_rfid_dropdown');
+        const addRfidList = document.getElementById('add_rfid_list');
+        const scanRfidBtn = document.getElementById('scan_rfid_btn');
+        const scanRfidInput = document.getElementById('scan_rfid_input');
+        const scanRfidHint = document.getElementById('scan_rfid_hint');
+
+        const availableRfids = @json($availableRfids ?? []);
+        let selectedRfid = '';
+
+        function renderRfidList() {
+            addRfidList.innerHTML = '';
+
+            if (availableRfids.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'rfid-empty';
+                empty.textContent = 'No available RFID tags. Scan one to add it here.';
+                addRfidList.appendChild(empty);
+                return;
+            }
+
+            availableRfids.forEach(function (tag) {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'rfid-option' + (tag === selectedRfid ? ' selected' : '');
+
+                const label = document.createElement('span');
+                label.textContent = tag;
+                option.appendChild(label);
+
+                if (tag === selectedRfid) {
+                    const check = document.createElement('i');
+                    check.className = 'bi bi-check2-circle';
+                    option.appendChild(check);
+                }
+
+                option.addEventListener('click', function () {
+                    selectRfid(tag);
+                });
+
+                addRfidList.appendChild(option);
+            });
+        }
+
+        function selectRfid(tag) {
+            selectedRfid = tag;
+            addRfidInput.value = tag;
+            renderRfidList();
+            closeRfidDropdown();
+        }
+
+        function openRfidDropdown() {
+            addRfidDropdown.classList.remove('d-none');
+            renderRfidList();
+        }
+
+        function closeRfidDropdown() {
+            addRfidDropdown.classList.add('d-none');
+            scanRfidInput.classList.add('d-none');
+            scanRfidHint.classList.add('d-none');
+        }
+
+        addRfidInput.addEventListener('click', openRfidDropdown);
+        addRfidToggle.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            if (addRfidDropdown.classList.contains('d-none')) {
+                openRfidDropdown();
+            } else {
+                closeRfidDropdown();
+            }
+        });
+
+        scanRfidBtn.addEventListener('click', function () {
+            scanRfidInput.value = '';
+            scanRfidInput.classList.remove('d-none');
+            scanRfidHint.classList.remove('d-none');
+            scanRfidInput.focus();
+        });
+
+        scanRfidInput.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+
+            const tag = scanRfidInput.value.replace(/\s+/g, '').toUpperCase();
+
+            if (!tag) {
+                return;
+            }
+
+            if (!availableRfids.includes(tag)) {
+                availableRfids.unshift(tag);
+            }
+
+            selectedRfid = tag;
+            addRfidInput.value = tag;
+            scanRfidInput.value = '';
+            scanRfidInput.classList.add('d-none');
+            scanRfidHint.classList.add('d-none');
+            addRfidList.scrollTop = 0;
+            renderRfidList();
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!addRfidDropdown.classList.contains('d-none') && !event.target.closest('.rfid-picker')) {
+                closeRfidDropdown();
+            }
+        });
+
+        document.getElementById('addModal').addEventListener('hidden.bs.modal', closeRfidDropdown);
 
         function editStudent(student) {
             document.getElementById('editForm').action = '/registrar/students/' + student.id;
