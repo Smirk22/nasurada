@@ -20,7 +20,7 @@ Route::get('/two-factor-verify', [AuthController::class, 'showTwoFactorChallenge
 Route::post('/two-factor-verify', [AuthController::class, 'verifyTwoFactorChallenge'])->name('two-factor.challenge.verify');
 Route::post('/two-factor-verify/cancel', [AuthController::class, 'cancelTwoFactorChallenge'])->name('two-factor.challenge.cancel');
 
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
+// Use Fortify's logout to avoid route conflicts; AuthController::logout still available if needed
 
 // Two-factor authentication management (any signed-in staff member)
 Route::middleware(['auth'])->group(function () {
@@ -39,8 +39,8 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
 });
 
-// Registrar Routes (registrar only)
-Route::middleware(['auth', 'role:Registrar'])->group(function () {
+// Registrar Routes (registrar and admin)
+Route::middleware(['auth', 'role:Admin,Registrar'])->group(function () {
     Route::get('/rdashboard', [RegistrarController::class, 'dashboard'])->name('rdashboard');
     Route::get('/registrar/students', [RegistrarController::class, 'students'])->name('registrar.students');
     Route::post('/registrar/students', [RegistrarController::class, 'store'])->name('registrar.students.store');
@@ -58,8 +58,8 @@ Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () 
     Route::post('/registrar/entry-logs', [EntryLogController::class, 'store'])->name('entry-logs.store');
 });
 
-// Guard Routes (security only)
-Route::middleware(['auth', 'role:Security'])->prefix('Security')->group(function () {
+// Guard Routes (security and admin)
+Route::middleware(['auth', 'role:Admin,Security'])->prefix('Security')->group(function () {
     Route::post('/dashboard/reset-feed', [GuardController::class, 'resetFeed'])->name('guard.feed.reset');
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');

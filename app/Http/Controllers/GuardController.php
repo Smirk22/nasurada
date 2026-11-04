@@ -15,8 +15,9 @@ class GuardController extends Controller
      */
     public function dashboard(Request $request)
     {
-        // Only security accounts may open this page
-        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+        // Security and Admin may open this page
+        $role = strtolower(trim(Auth::user()->role));
+        if ($role !== 'security' && $role !== 'admin') {
             abort(403);
         }
 
@@ -115,7 +116,8 @@ class GuardController extends Controller
      */
     public function resetFeed(Request $request)
     {
-        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+        $role = strtolower(trim(Auth::user()->role));
+        if ($role !== 'security' && $role !== 'admin') {
             abort(403);
         }
 
@@ -149,8 +151,8 @@ class GuardController extends Controller
      */
     public function latestScan()
     {
-        // Same role check as the dashboard
-        if (strtolower(trim(Auth::user()->role)) !== 'security') {
+        $role = strtolower(trim(Auth::user()->role));
+        if ($role !== 'security' && $role !== 'admin') {
             abort(403);
         }
 

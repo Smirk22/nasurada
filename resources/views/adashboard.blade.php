@@ -33,8 +33,10 @@
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <span class="font-bold text-lg tracking-wide">IETI - System Administration</span>
             <nav class="flex items-center space-x-6 text-sm font-medium">
-                <a href="/adashboard" class="text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1">Admin Dashboard</a>
-                <a href="{{ route('two-factor.setup') }}" class="hover:text-green-200 transition font-semibold">Two-Factor Auth</a>
+                <a href="/adashboard" class="{{ request()->is('adashboard') ? 'text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1' : 'hover:text-green-200 transition font-semibold' }}">Admin Dashboard</a>
+                <a href="/rdashboard" class="{{ request()->is('rdashboard') ? 'text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1' : 'hover:text-green-200 transition font-semibold' }}">Registrar Dashboard</a>
+                <a href="{{ route('guard.dashboard') }}" class="{{ request()->is('Security/dashboard') ? 'text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1' : 'hover:text-green-200 transition font-semibold' }}">Guard Dashboard</a>
+                <a href="{{ route('two-factor.setup') }}" class="{{ request()->is('settings/two-factor') ? 'text-yellow-300 font-semibold border-b-2 border-yellow-300 pb-1' : 'hover:text-green-200 transition font-semibold' }}">Two-Factor Auth</a>
 
                 <form action="{{ route('logout') }}" method="POST" class="inline">
                     @csrf
