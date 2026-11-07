@@ -18,10 +18,29 @@ class AdminController extends Controller
         $invalidRfidScans = EntryLog::whereDate('date', today())
             ->whereIn('status', ['denied', 'unknown', 'expired'])
             ->count();
+
+        $studentsWithRfid = Student::whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->count();
+        $studentsWithoutRfid = $totalStudents - $studentsWithRfid;
+
+        $validScans = EntryLog::where('status', 'granted')->count();
+        $invalidScans = EntryLog::whereIn('status', ['denied', 'unknown', 'expired'])->count();
+
         $users = User::all();
         $activities = ActivityLog::latest()->get();
 
-        return view('adashboard', compact('totalUsers', 'totalStudents', 'invalidRfidScans', 'users', 'activities'));
+        return view('adashboard', compact(
+            'totalUsers',
+            'totalStudents',
+            'invalidRfidScans',
+            'studentsWithRfid',
+            'studentsWithoutRfid',
+            'validScans',
+            'invalidScans',
+            'users',
+            'activities'
+        ));
     }
 
     public function storeUser(Request $request)

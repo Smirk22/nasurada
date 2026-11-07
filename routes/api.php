@@ -9,3 +9,4 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::post('/rfid-scan', [RfidController::class, 'store']);
+Route::get('/rfid-scan/latest', [RfidController::class, 'latest']);

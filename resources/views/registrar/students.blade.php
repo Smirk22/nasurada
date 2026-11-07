@@ -354,7 +354,7 @@
                         <div class="rfid-picker">
                             <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag (Optional)</label>
                             <div class="input-group">
-                                <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off" readonly>
+                                <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off">
                                 <button type="button" class="btn btn-outline-secondary" id="add_rfid_toggle" aria-label="Show available RFID tags">
                                     <i class="bi bi-chevron-down"></i>
                                 </button>
@@ -366,6 +366,7 @@
                                     </button>
                                     <input type="text" id="scan_rfid_input" class="form-control form-control-sm mt-2 d-none" placeholder="Scan the card or type the tag, then press Enter" autocomplete="off">
                                     <div class="small text-muted mt-1 d-none" id="scan_rfid_hint">Waiting for an RFID scan...</div>
+                                    <div class="small text-danger mt-2 d-none" id="add_rfid_warning"></div>
                                 </div>
                                 <div class="rfid-list" id="add_rfid_list"></div>
                             </div>
@@ -491,9 +492,81 @@
         const scanRfidBtn = document.getElementById('scan_rfid_btn');
         const scanRfidInput = document.getElementById('scan_rfid_input');
         const scanRfidHint = document.getElementById('scan_rfid_hint');
+        const addRfidWarning = document.getElementById('add_rfid_warning');
 
         const availableRfids = @json($availableRfids ?? []);
+        const assignedRfidOwners = @json($assignedRfidOwners ?? []);
         let selectedRfid = '';
+        let scanCommitTimer = null;
+
+        function normalizeRfid(value) {
+            return (value || '').replace(/\s+/g, '').toUpperCase();
+        }
+
+        function clearRfidWarning() {
+            addRfidWarning.textContent = '';
+            addRfidWarning.classList.add('d-none');
+        }
+
+        function showRfidWarning(message) {
+            addRfidWarning.textContent = message;
+            addRfidWarning.classList.remove('d-none');
+            openRfidDropdown();
+            addRfidList.scrollTop = 0;
+        }
+
+        function commitScannedRfid(value, owner) {
+            const tag = normalizeRfid(value);
+
+            if (!tag) {
+                return false;
+            }
+
+            const assignedOwner = owner || assignedRfidOwners[tag];
+
+            if (assignedOwner) {
+                const index = availableRfids.indexOf(tag);
+
+                if (index !== -1) {
+                    availableRfids.splice(index, 1);
+                }
+
+                selectedRfid = '';
+                addRfidInput.value = '';
+                scanRfidInput.value = '';
+                scanRfidInput.classList.add('d-none');
+                scanRfidHint.classList.add('d-none');
+                showRfidWarning(tag + ' is already assigned to ' + assignedOwner + '.');
+                window.alert('This rfid is already registered');
+
+                return false;
+            }
+
+            clearRfidWarning();
+
+            if (!availableRfids.includes(tag)) {
+                availableRfids.unshift(tag);
+            }
+
+            selectedRfid = tag;
+            addRfidInput.value = tag;
+            scanRfidInput.value = '';
+            scanRfidInput.classList.add('d-none');
+            scanRfidHint.classList.add('d-none');
+            openRfidDropdown();
+            addRfidList.scrollTop = 0;
+
+            return true;
+        }
+
+        function scheduleScanCommit(input) {
+            clearTimeout(scanCommitTimer);
+            scanCommitTimer = setTimeout(function () {
+                if (normalizeRfid(input.value)) {
+                    commitScannedRfid(input.value);
+                }
+            }, 400);
+        }
 
         function renderRfidList() {
             addRfidList.innerHTML = '';
@@ -532,6 +605,7 @@
         function selectRfid(tag) {
             selectedRfid = tag;
             addRfidInput.value = tag;
+            clearRfidWarning();
             renderRfidList();
             closeRfidDropdown();
         }
@@ -545,9 +619,23 @@
             addRfidDropdown.classList.add('d-none');
             scanRfidInput.classList.add('d-none');
             scanRfidHint.classList.add('d-none');
+            clearRfidWarning();
         }
 
         addRfidInput.addEventListener('click', openRfidDropdown);
+        addRfidInput.addEventListener('input', function () {
+            clearRfidWarning();
+            openRfidDropdown();
+            scheduleScanCommit(addRfidInput);
+        });
+        addRfidInput.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+            commitScannedRfid(addRfidInput.value);
+        });
         addRfidToggle.addEventListener('click', function (event) {
             event.preventDefault();
 
@@ -559,10 +647,16 @@
         });
 
         scanRfidBtn.addEventListener('click', function () {
+            clearRfidWarning();
             scanRfidInput.value = '';
             scanRfidInput.classList.remove('d-none');
             scanRfidHint.classList.remove('d-none');
             scanRfidInput.focus();
+        });
+
+        scanRfidInput.addEventListener('input', function () {
+            clearRfidWarning();
+            scheduleScanCommit(scanRfidInput);
         });
 
         scanRfidInput.addEventListener('keydown', function (event) {
@@ -571,24 +665,7 @@
             }
 
             event.preventDefault();
-
-            const tag = scanRfidInput.value.replace(/\s+/g, '').toUpperCase();
-
-            if (!tag) {
-                return;
-            }
-
-            if (!availableRfids.includes(tag)) {
-                availableRfids.unshift(tag);
-            }
-
-            selectedRfid = tag;
-            addRfidInput.value = tag;
-            scanRfidInput.value = '';
-            scanRfidInput.classList.add('d-none');
-            scanRfidHint.classList.add('d-none');
-            addRfidList.scrollTop = 0;
-            renderRfidList();
+            commitScannedRfid(scanRfidInput.value);
         });
 
         document.addEventListener('click', function (event) {
@@ -597,7 +674,70 @@
             }
         });
 
-        document.getElementById('addModal').addEventListener('hidden.bs.modal', closeRfidDropdown);
+        document.getElementById('addModal').addEventListener('hidden.bs.modal', function () {
+            clearTimeout(scanCommitTimer);
+            clearRfidWarning();
+            closeRfidDropdown();
+        });
+
+        // Pick up the latest scan from the same live feed the guard dashboard uses.
+        const rfidLatestUrl = '/api/rfid-scan/latest';
+        let rfidPollTimer = null;
+        let rfidPolling = false;
+        let lastScanNonce = null;
+
+        function fetchLatestRfid() {
+            return fetch(rfidLatestUrl, {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            }).then(function (response) {
+                return response.ok ? response.json() : null;
+            }).catch(function () {
+                return null;
+            });
+        }
+
+        function startRfidPolling() {
+            if (rfidPolling) {
+                return;
+            }
+
+            rfidPolling = true;
+
+            // Remember the current scan so an older tap is not added when the modal opens.
+            fetchLatestRfid().then(function (scan) {
+                if (rfidPolling) {
+                    lastScanNonce = scan ? scan.nonce : null;
+                }
+            });
+
+            rfidPollTimer = setInterval(function () {
+                if (!rfidPolling) {
+                    return;
+                }
+
+                fetchLatestRfid().then(function (latest) {
+                    if (!rfidPolling || !latest || !latest.uid || latest.nonce === lastScanNonce) {
+                        return;
+                    }
+
+                    lastScanNonce = latest.nonce;
+                    commitScannedRfid(latest.uid, latest.owner);
+                });
+            }, 1500);
+        }
+
+        function stopRfidPolling() {
+            rfidPolling = false;
+
+            if (rfidPollTimer) {
+                clearInterval(rfidPollTimer);
+                rfidPollTimer = null;
+            }
+        }
+
+        document.getElementById('addModal').addEventListener('shown.bs.modal', startRfidPolling);
+        document.getElementById('addModal').addEventListener('hidden.bs.modal', stopRfidPolling);
 
         function editStudent(student) {
             document.getElementById('editForm').action = '/registrar/students/' + student.id;

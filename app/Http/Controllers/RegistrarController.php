@@ -48,7 +48,18 @@ class RegistrarController extends Controller
         $assignedRfids = Student::pluck('rfid_tag')->filter()->toArray();
         $availableRfids = $this->generateAvailableRfids($assignedRfids);
 
-        return view('registrar.students', compact('students', 'availableRfids'));
+        $assignedRfidOwners = Student::query()
+            ->whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->get(['first_name', 'last_name', 'rfid_tag'])
+            ->mapWithKeys(function (Student $student) {
+                $tag = strtoupper(preg_replace('/\s+/', '', $student->rfid_tag));
+
+                return [$tag => trim($student->first_name.' '.$student->last_name)];
+            })
+            ->all();
+
+        return view('registrar.students', compact('students', 'availableRfids', 'assignedRfidOwners'));
     }
 
     /**

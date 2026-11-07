@@ -78,6 +78,38 @@ class RfidController extends Controller
         ]);
     }
 
+    public function latest(): JsonResponse
+    {
+        // The guard's live entry feed is backed by EntryLog, so the registrar
+        // reads the newest scan from the same source instead of a second store.
+        $log = EntryLog::whereDate('date', today())
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $log) {
+            return response()->json(['uid' => null, 'nonce' => null, 'at' => null]);
+        }
+
+        $owner = null;
+
+        if ($log->card_uid) {
+            $cardUid = strtoupper(preg_replace('/\s+/', '', $log->card_uid));
+            $student = Student::whereRaw("UPPER(REPLACE(rfid_tag, ' ', '')) = ?", [$cardUid])->first();
+
+            if ($student) {
+                $owner = trim($student->first_name.' '.$student->last_name);
+            }
+        }
+
+        return response()->json([
+            'uid' => $log->card_uid,
+            'nonce' => $log->id.'-'.$log->updated_at->timestamp,
+            'at' => $log->updated_at->toIso8601String(),
+            'owner' => $owner,
+        ]);
+    }
+
     private function reject(
         string $uid,
         string $reason,
