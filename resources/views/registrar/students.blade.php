@@ -88,44 +88,6 @@
             overflow: hidden;
         }
 
-        .rfid-list {
-            max-height: 240px;
-            overflow-y: auto;
-        }
-
-        .rfid-option {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            padding: .55rem .75rem;
-            border: 0;
-            border-bottom: 1px solid #f1f3f5;
-            background: transparent;
-            color: #212529;
-            font-family: var(--bs-font-monospace);
-            font-size: .82rem;
-            text-align: left;
-        }
-
-        .rfid-option:last-child {
-            border-bottom: 0;
-        }
-
-        .rfid-option:hover,
-        .rfid-option:focus,
-        .rfid-option.selected {
-            background: #eef7f1;
-            color: var(--ieti-green);
-            outline: none;
-        }
-
-        .rfid-empty {
-            padding: .75rem;
-            color: #6c757d;
-            font-size: .82rem;
-            text-align: center;
-        }
     </style>
 </head>
 <body class="bg-gray-100 font-sans min-h-screen">
@@ -350,17 +312,25 @@
                             </div>
                         </div>
 
+                        <!-- Phone Number -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="add_phone_number">Phone Number</label>
+                            <input type="tel" name="phone_number" id="add_phone_number" placeholder="e.g., 09171234567" class="form-control" autocomplete="off">
+                            <div class="text-danger small hidden" id="add_phone_error">Enter a valid PH mobile number (e.g., 09171234567 or +639171234567)</div>
+                            <div class="form-text">Receives an SMS confirmation when the student enters the school premises.</div>
+                        </div>
+
                         <!-- RFID Tag (Optional) -->
                         <div class="rfid-picker">
                             <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag (Optional)</label>
                             <div class="input-group">
-                                <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off">
-                                <button type="button" class="btn btn-outline-secondary" id="add_rfid_toggle" aria-label="Show available RFID tags">
+                                <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off">
+                                <button type="button" class="btn btn-outline-secondary" id="add_rfid_toggle" aria-label="Show RFID scan options">
                                     <i class="bi bi-chevron-down"></i>
                                 </button>
                             </div>
                             <div class="rfid-dropdown d-none" id="add_rfid_dropdown">
-                                <div class="p-2 border-bottom bg-light">
+                                <div class="p-2">
                                     <button type="button" class="btn btn-ieti btn-sm w-100 fw-semibold" id="scan_rfid_btn">
                                         <i class="bi bi-upc-scan me-1"></i> Scan an RFID
                                     </button>
@@ -368,7 +338,6 @@
                                     <div class="small text-muted mt-1 d-none" id="scan_rfid_hint">Waiting for an RFID scan...</div>
                                     <div class="small text-danger mt-2 d-none" id="add_rfid_warning"></div>
                                 </div>
-                                <div class="rfid-list" id="add_rfid_list"></div>
                             </div>
                         </div>
                     </div>
@@ -447,6 +416,13 @@
                             </div>
                         </div>
 
+                        <!-- Phone Number -->
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary" for="edit_phone_number">Phone Number</label>
+                            <input type="tel" id="edit_phone_number" name="phone_number" placeholder="e.g., 09171234567" class="form-control" autocomplete="off">
+                            <div class="text-danger small hidden" id="edit_phone_error">Enter a valid PH mobile number (e.g., 09171234567 or +639171234567)</div>
+                        </div>
+
                         <!-- RFID Tag Assignment -->
                         <div class="mb-3">
                             <label class="form-label small fw-semibold text-secondary" for="edit_rfid_tag">RFID Tag Assignment</label>
@@ -488,15 +464,17 @@
         const addRfidInput = document.getElementById('add_rfid_tag');
         const addRfidToggle = document.getElementById('add_rfid_toggle');
         const addRfidDropdown = document.getElementById('add_rfid_dropdown');
-        const addRfidList = document.getElementById('add_rfid_list');
         const scanRfidBtn = document.getElementById('scan_rfid_btn');
         const scanRfidInput = document.getElementById('scan_rfid_input');
         const scanRfidHint = document.getElementById('scan_rfid_hint');
         const addRfidWarning = document.getElementById('add_rfid_warning');
 
-        const availableRfids = @json($availableRfids ?? []);
+        const rfidScanModeUrl = '{{ route('registrar.rfid.scan-mode') }}';
+        const rfidScanModeCancelUrl = '{{ route('registrar.rfid.scan-mode.cancel') }}';
+        const rfidScanLatestUrl = '{{ route('registrar.rfid.scan-latest') }}';
+        const csrfToken = document.querySelector('#addModal input[name="_token"]').value;
+
         const assignedRfidOwners = @json($assignedRfidOwners ?? []);
-        let selectedRfid = '';
         let scanCommitTimer = null;
 
         function normalizeRfid(value) {
@@ -512,10 +490,11 @@
             addRfidWarning.textContent = message;
             addRfidWarning.classList.remove('d-none');
             openRfidDropdown();
-            addRfidList.scrollTop = 0;
         }
 
         function commitScannedRfid(value, owner) {
+            cancelRegistrationScan();
+
             const tag = normalizeRfid(value);
 
             if (!tag) {
@@ -525,13 +504,6 @@
             const assignedOwner = owner || assignedRfidOwners[tag];
 
             if (assignedOwner) {
-                const index = availableRfids.indexOf(tag);
-
-                if (index !== -1) {
-                    availableRfids.splice(index, 1);
-                }
-
-                selectedRfid = '';
                 addRfidInput.value = '';
                 scanRfidInput.value = '';
                 scanRfidInput.classList.add('d-none');
@@ -544,17 +516,11 @@
 
             clearRfidWarning();
 
-            if (!availableRfids.includes(tag)) {
-                availableRfids.unshift(tag);
-            }
-
-            selectedRfid = tag;
             addRfidInput.value = tag;
             scanRfidInput.value = '';
             scanRfidInput.classList.add('d-none');
             scanRfidHint.classList.add('d-none');
-            openRfidDropdown();
-            addRfidList.scrollTop = 0;
+            closeRfidDropdown();
 
             return true;
         }
@@ -568,51 +534,8 @@
             }, 400);
         }
 
-        function renderRfidList() {
-            addRfidList.innerHTML = '';
-
-            if (availableRfids.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = 'rfid-empty';
-                empty.textContent = 'No available RFID tags. Scan one to add it here.';
-                addRfidList.appendChild(empty);
-                return;
-            }
-
-            availableRfids.forEach(function (tag) {
-                const option = document.createElement('button');
-                option.type = 'button';
-                option.className = 'rfid-option' + (tag === selectedRfid ? ' selected' : '');
-
-                const label = document.createElement('span');
-                label.textContent = tag;
-                option.appendChild(label);
-
-                if (tag === selectedRfid) {
-                    const check = document.createElement('i');
-                    check.className = 'bi bi-check2-circle';
-                    option.appendChild(check);
-                }
-
-                option.addEventListener('click', function () {
-                    selectRfid(tag);
-                });
-
-                addRfidList.appendChild(option);
-            });
-        }
-
-        function selectRfid(tag) {
-            selectedRfid = tag;
-            addRfidInput.value = tag;
-            clearRfidWarning();
-            renderRfidList();
-            closeRfidDropdown();
-        }
-
         function openRfidDropdown() {
             addRfidDropdown.classList.remove('d-none');
-            renderRfidList();
         }
 
         function closeRfidDropdown() {
@@ -620,12 +543,12 @@
             scanRfidInput.classList.add('d-none');
             scanRfidHint.classList.add('d-none');
             clearRfidWarning();
+            cancelRegistrationScan();
         }
 
         addRfidInput.addEventListener('click', openRfidDropdown);
         addRfidInput.addEventListener('input', function () {
             clearRfidWarning();
-            openRfidDropdown();
             scheduleScanCommit(addRfidInput);
         });
         addRfidInput.addEventListener('keydown', function (event) {
@@ -652,10 +575,12 @@
             scanRfidInput.classList.remove('d-none');
             scanRfidHint.classList.remove('d-none');
             scanRfidInput.focus();
+            beginRegistrationScan();
         });
 
         scanRfidInput.addEventListener('input', function () {
             clearRfidWarning();
+            cancelRegistrationScan();
             scheduleScanCommit(scanRfidInput);
         });
 
@@ -665,6 +590,7 @@
             }
 
             event.preventDefault();
+            cancelRegistrationScan();
             commitScannedRfid(scanRfidInput.value);
         });
 
@@ -680,36 +606,68 @@
             closeRfidDropdown();
         });
 
-        // Pick up the latest scan from the same live feed the guard dashboard uses.
-        const rfidLatestUrl = '/api/rfid-scan/latest';
+        document.getElementById('addModal').addEventListener('shown.bs.modal', beginRegistrationScan);
+
+        // Registration scan mode: while armed, the API captures taps for the
+        // registrar instead of adding them to the guard's live entry feed.
         let rfidPollTimer = null;
         let rfidPolling = false;
+        let registrationScanArmed = false;
         let lastScanNonce = null;
 
+        function parseJsonResponse(response) {
+            return response.ok ? response.json() : null;
+        }
+
         function fetchLatestRfid() {
-            return fetch(rfidLatestUrl, {
+            return fetch(rfidScanLatestUrl, {
                 headers: { 'Accept': 'application/json' },
                 cache: 'no-store'
-            }).then(function (response) {
-                return response.ok ? response.json() : null;
-            }).catch(function () {
+            }).then(parseJsonResponse).catch(function () {
                 return null;
             });
         }
 
-        function startRfidPolling() {
-            if (rfidPolling) {
+        function beginRegistrationScan() {
+            fetch(rfidScanModeUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            }).then(function (response) {
+                registrationScanArmed = response.ok;
+                startRfidPolling();
+            }).catch(function () {
+                startRfidPolling();
+            });
+        }
+
+        function cancelRegistrationScan() {
+            stopRfidPolling();
+
+            if (!registrationScanArmed) {
                 return;
             }
 
-            rfidPolling = true;
+            registrationScanArmed = false;
 
-            // Remember the current scan so an older tap is not added when the modal opens.
-            fetchLatestRfid().then(function (scan) {
-                if (rfidPolling) {
-                    lastScanNonce = scan ? scan.nonce : null;
+            fetch(rfidScanModeCancelUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
                 }
+            }).catch(function () {
+                // ignore network errors
             });
+        }
+
+        function startRfidPolling() {
+            stopRfidPolling();
+
+            rfidPolling = true;
+            lastScanNonce = null;
 
             rfidPollTimer = setInterval(function () {
                 if (!rfidPolling) {
@@ -722,9 +680,11 @@
                     }
 
                     lastScanNonce = latest.nonce;
+                    registrationScanArmed = false;
+                    stopRfidPolling();
                     commitScannedRfid(latest.uid, latest.owner);
                 });
-            }, 1500);
+            }, 1000);
         }
 
         function stopRfidPolling() {
@@ -736,9 +696,6 @@
             }
         }
 
-        document.getElementById('addModal').addEventListener('shown.bs.modal', startRfidPolling);
-        document.getElementById('addModal').addEventListener('hidden.bs.modal', stopRfidPolling);
-
         function editStudent(student) {
             document.getElementById('editForm').action = '/registrar/students/' + student.id;
             document.getElementById('edit_student_number').value = student.student_number || '';
@@ -747,6 +704,7 @@
             document.getElementById('edit_course').value = student.course || 'BSIT';
             document.getElementById('edit_year_level').value = student.year_level || '';
             document.getElementById('edit_section').value = student.section || '';
+            document.getElementById('edit_phone_number').value = student.phone_number || '';
             document.getElementById('edit_rfid_tag').value = student.rfid_tag || '';
             document.getElementById('edit_status').value = student.status || 'Enrolled';
             openModal('editModal');
@@ -785,6 +743,16 @@
                 document.getElementById('add_last_error').classList.add('hidden');
             }
 
+            // Validate Phone Number (optional, PH mobile format)
+            const addPhone = document.getElementById('add_phone_number').value.trim();
+            const phoneRegex = /^(?:\+?63|0)9\d{9}$/;
+            if (addPhone !== '' && !phoneRegex.test(addPhone)) {
+                document.getElementById('add_phone_error').classList.remove('hidden');
+                valid = false;
+            } else {
+                document.getElementById('add_phone_error').classList.add('hidden');
+            }
+
             return valid;
         }
 
@@ -819,6 +787,16 @@
                 valid = false;
             } else {
                 document.getElementById('edit_last_error').classList.add('hidden');
+            }
+
+            // Validate Phone Number (optional, PH mobile format)
+            const editPhone = document.getElementById('edit_phone_number').value.trim();
+            const phoneRegex = /^(?:\+?63|0)9\d{9}$/;
+            if (editPhone !== '' && !phoneRegex.test(editPhone)) {
+                document.getElementById('edit_phone_error').classList.remove('hidden');
+                valid = false;
+            } else {
+                document.getElementById('edit_phone_error').classList.add('hidden');
             }
 
             return valid;

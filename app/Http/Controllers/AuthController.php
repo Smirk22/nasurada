@@ -124,7 +124,6 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->session()->forget('feed_reset_after_id');
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();

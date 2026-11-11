@@ -135,45 +135,6 @@
             overflow: hidden;
         }
 
-        .rfid-list {
-            max-height: 240px;
-            overflow-y: auto;
-        }
-
-        .rfid-option {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 100%;
-            padding: .55rem .75rem;
-            border: 0;
-            border-bottom: 1px solid #f1f3f5;
-            background: transparent;
-            color: #212529;
-            font-family: var(--bs-font-monospace);
-            font-size: .82rem;
-            text-align: left;
-        }
-
-        .rfid-option:last-child {
-            border-bottom: 0;
-        }
-
-        .rfid-option:hover,
-        .rfid-option:focus,
-        .rfid-option.selected {
-            background: #eef7f1;
-            color: var(--ieti-green);
-            outline: none;
-        }
-
-        .rfid-empty {
-            padding: .75rem;
-            color: #6c757d;
-            font-size: .82rem;
-            text-align: center;
-        }
-
         @keyframes live-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: .35; transform: scale(.8); }
@@ -228,6 +189,18 @@
                     </div>
                 @endif
 
+                @if($errors->any())
+                    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-start gap-2 shadow-sm" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill mt-1"></i>
+                        <div>
+                            @foreach($errors->all() as $error)
+                                <div class="small">{{ $error }}</div>
+                            @endforeach
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
+
                 <!-- Stats Cards -->
                 <div class="row g-3 g-lg-4 mb-4">
                     <!-- Students Verified Today -->
@@ -278,38 +251,11 @@
 
                 <!-- Live Entry Feed -->
                 <div class="card page-card mb-4">
-                    <div class="card-header bg-white border-bottom px-3 px-md-4 py-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                        <div>
-                            <h2 class="h5 fw-bold text-dark mb-1 d-flex align-items-center gap-2">
-                                <span class="live-dot"></span> Live Entry Feed
-                            </h2>
-                            <p class="text-muted small mb-0">Last scanned students (real-time, newest first)</p>
-                        </div>
-
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <div id="feed-meta" class="d-flex flex-wrap align-items-center gap-2">
-                                @if($feedResetAt)
-                                    <span class="badge text-bg-warning">
-                                        <i class="bi bi-funnel me-1"></i>New scans since {{ \Carbon\Carbon::parse($feedResetAt)->format('g:i A') }}
-                                    </span>
-                                    <form action="{{ route('guard.feed.reset') }}" method="POST" class="d-inline">
-                                        @csrf
-                                        <input type="hidden" name="action" value="restore">
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Show all
-                                        </button>
-                                    </form>
-                                @endif
-                            </div>
-
-                            <form action="{{ route('guard.feed.reset') }}" method="POST" class="d-inline"
-                                  onsubmit="return confirm('Clear the current live entry feed? New scans will still appear.');">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger">
-                                    <i class="bi bi-eraser me-1"></i>Reset Feed
-                                </button>
-                            </form>
-                        </div>
+                    <div class="card-header bg-white border-bottom px-3 px-md-4 py-3">
+                        <h2 class="h5 fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                            <span class="live-dot"></span> Live Entry Feed
+                        </h2>
+                        <p class="text-muted small mb-0">Last scanned students (real-time, newest first)</p>
                     </div>
 
                     <div class="table-responsive feed-scroll">
@@ -328,10 +274,14 @@
                             <tbody id="live-feed">
                                 @forelse($entryLogs as $log)
                                     @php
-                                        $isUnknown = is_null($log->student_id) || $log->status === 'unknown';
+                                        $isVisitor = !is_null($log->visitor_id) && $log->visitor;
+                                        $isUnknown = (is_null($log->student_id) && is_null($log->visitor_id)) || $log->status === 'unknown';
                                         $isExpired = !$isUnknown && $log->status === 'expired';
                                         $isDenied = !$isUnknown && !$isExpired && $log->status === 'denied';
                                         $isBadScan = $isUnknown || $isDenied || $isExpired;
+                                        $personName = $log->student
+                                            ? trim($log->student->first_name.' '.$log->student->last_name)
+                                            : ($log->visitor?->visitor_name);
                                     @endphp
 
                                     <tr class="{{ $isBadScan ? 'table-danger' : '' }}">
@@ -345,6 +295,10 @@
                                                 <span class="photo-avatar bg-success text-white">
                                                     {{ strtoupper(substr($log->student->first_name, 0, 1)) }}
                                                 </span>
+                                            @elseif($isVisitor)
+                                                <span class="photo-avatar bg-primary text-white">
+                                                    {{ strtoupper(substr($log->visitor->visitor_name, 0, 1)) }}
+                                                </span>
                                             @else
                                                 <span class="photo-avatar bg-danger text-white">
                                                     <i class="bi bi-exclamation-triangle-fill"></i>
@@ -357,13 +311,16 @@
                                             @if($isUnknown)
                                                 Unregistered Tag
                                             @elseif($isDenied)
-                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
+                                                {{ $personName }}
                                                 <span class="badge text-bg-danger ms-1">{{ $log->reason === 'enrollment_not_confirmed' ? 'Not Confirmed' : 'Not Enrolled' }}</span>
                                             @elseif($isExpired)
-                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
-                                                <span class="badge text-bg-warning text-dark ms-1">Expired Card</span>
+                                                {{ $personName }}
+                                                <span class="badge text-bg-warning text-dark ms-1">{{ $isVisitor ? 'Expired Visitor ID' : 'Expired Card' }}</span>
                                             @else
-                                                {{ $log->student->first_name }} {{ $log->student->last_name }}
+                                                {{ $personName }}
+                                                @if($isVisitor)
+                                                    <span class="badge text-bg-info ms-1">Visitor</span>
+                                                @endif
                                             @endif
                                         </td>
 
@@ -371,6 +328,8 @@
                                         <td class="{{ $isBadScan ? 'text-danger rfid-code fw-semibold' : 'text-muted' }}">
                                             @if($isUnknown)
                                                 UID: {{ $log->card_uid ?? 'N/A' }}
+                                            @elseif($isVisitor)
+                                                Visitor ID: {{ $log->visitor->id_number }}
                                             @else
                                                 {{ $log->student->student_number }}
                                             @endif
@@ -405,6 +364,10 @@
                                         <td class="pe-4">
                                             @if($isUnknown)
                                                 <span class="badge text-bg-danger">Not in Database</span>
+                                            @elseif($isVisitor)
+                                                <span class="badge {{ $isExpired ? 'text-bg-warning text-dark' : 'text-bg-info' }}">
+                                                    {{ $isExpired ? 'Visitor Expired' : 'Visitor' }}
+                                                </span>
                                             @elseif($isExpired)
                                                 <span class="badge text-bg-warning text-dark">{{ ucfirst($log->student->card_type) }} Expired</span>
                                             @else
@@ -463,8 +426,8 @@
                                                class="form-control" placeholder="ID #">
                                     </div>
 
-                                    <!-- Visiting & Pass Duration -->
-                                    <div class="col-12 col-md-6">
+                                    <!-- Visiting -->
+                                    <div class="col-12">
                                         <label class="form-label small fw-semibold text-secondary" for="visiting_department">Visiting</label>
                                         <select name="visiting_department" id="visiting_department" required class="form-select">
                                             <option value="">Department</option>
@@ -473,34 +436,25 @@
                                             <option value="faculty">Faculty</option>
                                         </select>
                                     </div>
-                                    <div class="col-12 col-md-6">
-                                        <label class="form-label small fw-semibold text-secondary" for="pass_duration">Pass Valid For</label>
-                                        <select name="pass_duration" id="pass_duration" required class="form-select">
-                                            <option value="1">1 hour</option>
-                                            <option value="2" selected>2 hours</option>
-                                            <option value="4">4 hours</option>
-                                            <option value="8">8 hours</option>
-                                        </select>
-                                    </div>
 
                                     <!-- Available RFID Tag -->
                                     <div class="col-12 rfid-picker">
                                         <label class="form-label small fw-semibold text-secondary" for="visitor_rfid_tag">Assign RFID Tag</label>
                                         <div class="input-group">
-                                            <input type="text" name="rfid_tag" id="visitor_rfid_tag" placeholder="Click to choose or scan an RFID tag" class="form-control" autocomplete="off" required>
-                                            <button type="button" class="btn btn-outline-secondary" id="visitor_rfid_toggle" aria-label="Show available RFID tags">
+                                            <input type="text" name="rfid_tag" id="visitor_rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off" required>
+                                            <button type="button" class="btn btn-outline-secondary" id="visitor_rfid_toggle" aria-label="Show RFID scan options">
                                                 <i class="bi bi-chevron-down"></i>
                                             </button>
                                         </div>
+                                        <div class="small text-danger mt-1 d-none" id="visitor_rfid_warning"></div>
                                         <div class="rfid-dropdown d-none" id="visitor_rfid_dropdown">
-                                            <div class="p-2 border-bottom bg-light">
+                                            <div class="p-2">
                                                 <button type="button" class="btn btn-ieti btn-sm w-100 fw-semibold" id="scan_visitor_rfid_btn">
                                                     <i class="bi bi-upc-scan me-1"></i> Scan an RFID
                                                 </button>
                                                 <input type="text" id="scan_visitor_rfid_input" class="form-control form-control-sm mt-2 d-none" placeholder="Scan the card or type the tag, then press Enter" autocomplete="off">
                                                 <div class="small text-muted mt-1 d-none" id="scan_visitor_rfid_hint">Waiting for an RFID scan...</div>
                                             </div>
-                                            <div class="rfid-list" id="visitor_rfid_list"></div>
                                         </div>
                                     </div>
 
@@ -567,6 +521,44 @@
                                             <span class="text-muted small">Currently Out</span>
                                             <span class="fw-bold fs-5 text-danger">{{ $currentlyOut ?? 0 }}</span>
                                         </div>
+                                        <div class="d-flex justify-content-between align-items-center bg-light rounded-3 px-3 py-2">
+                                            <span class="text-muted small">Sent Messages</span>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span id="sent-messages-count" class="fw-bold fs-5 text-success">{{ $sentMessagesCount ?? 0 }}</span>
+                                                <div class="dropdown">
+                                                    <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button"
+                                                            id="sent-messages-toggle" data-bs-toggle="dropdown"
+                                                            data-bs-auto-close="outside" aria-expanded="false">
+                                                        <i class="bi bi-envelope-paper me-1"></i>View
+                                                    </button>
+                                                    <div class="dropdown-menu dropdown-menu-end shadow" id="sent-messages-menu"
+                                                         style="min-width: 340px; max-width: min(420px, 90vw); max-height: 320px; overflow-y: auto;"
+                                                         aria-labelledby="sent-messages-toggle">
+                                                        <h6 class="dropdown-header d-flex justify-content-between align-items-center">
+                                                            <span>Messages Sent Today</span>
+                                                            <span class="badge text-bg-success">{{ $sentMessagesCount ?? 0 }}</span>
+                                                        </h6>
+                                                        @forelse($sentMessages as $sent)
+                                                            <div class="dropdown-item-text small border-top">
+                                                                <div class="d-flex justify-content-between gap-2">
+                                                                    <span class="fw-semibold text-dark">
+                                                                        {{ $sent->student ? trim($sent->student->first_name.' '.$sent->student->last_name) : 'Unknown student' }}
+                                                                    </span>
+                                                                    <span class="text-muted text-nowrap">{{ $sent->sent_at?->format('g:i A') }}</span>
+                                                                </div>
+                                                                <div class="text-muted">{{ $sent->recipient }}</div>
+                                                                <div class="text-muted" style="white-space: normal;">{{ $sent->message }}</div>
+                                                            </div>
+                                                        @empty
+                                                            <div class="dropdown-item-text small text-muted text-center py-3">
+                                                                <i class="bi bi-envelope-x d-block fs-5 mb-1"></i>
+                                                                No messages sent today.
+                                                            </div>
+                                                        @endforelse
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -602,70 +594,217 @@
 
     <!-- Visitor RFID Picker -->
     <script>
+        const visitorForm = document.getElementById('visitorForm');
         const visitorRfidInput = document.getElementById('visitor_rfid_tag');
         const visitorRfidToggle = document.getElementById('visitor_rfid_toggle');
         const visitorRfidDropdown = document.getElementById('visitor_rfid_dropdown');
-        const visitorRfidList = document.getElementById('visitor_rfid_list');
         const scanVisitorRfidBtn = document.getElementById('scan_visitor_rfid_btn');
         const scanVisitorRfidInput = document.getElementById('scan_visitor_rfid_input');
         const scanVisitorRfidHint = document.getElementById('scan_visitor_rfid_hint');
+        const visitorRfidWarning = document.getElementById('visitor_rfid_warning');
 
-        const visitorAvailableRfids = @json($availableRfids ?? []);
-        let visitorSelectedRfid = '';
+        const visitorRfidScanModeUrl = '{{ route('guard.rfid.scan-mode') }}';
+        const visitorRfidScanModeCancelUrl = '{{ route('guard.rfid.scan-mode.cancel') }}';
+        const visitorRfidScanLatestUrl = '{{ route('guard.rfid.scan-latest') }}';
+        const visitorRfidCsrfToken = visitorForm.querySelector('input[name="_token"]').value;
+        const assignedRfidOwners = @json($assignedRfidOwners ?? []);
 
-        function renderVisitorRfidList() {
-            visitorRfidList.innerHTML = '';
+        let visitorScanCommitTimer = null;
+        let visitorRfidPollTimer = null;
+        let visitorRfidPolling = false;
+        let visitorRegistrationArmed = false;
+        let visitorRfidScanStarting = false;
+        let visitorRfidScanWanted = false;
+        let lastVisitorScanNonce = null;
 
-            if (visitorAvailableRfids.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = 'rfid-empty';
-                empty.textContent = 'No available RFID tags. Scan one to add it here.';
-                visitorRfidList.appendChild(empty);
-                return;
-            }
-
-            visitorAvailableRfids.forEach(function (tag) {
-                const option = document.createElement('button');
-                option.type = 'button';
-                option.className = 'rfid-option' + (tag === visitorSelectedRfid ? ' selected' : '');
-
-                const label = document.createElement('span');
-                label.textContent = tag;
-                option.appendChild(label);
-
-                if (tag === visitorSelectedRfid) {
-                    const check = document.createElement('i');
-                    check.className = 'bi bi-check2-circle';
-                    option.appendChild(check);
-                }
-
-                option.addEventListener('click', function () {
-                    selectVisitorRfid(tag);
-                });
-
-                visitorRfidList.appendChild(option);
-            });
+        function normalizeRfid(value) {
+            return (value || '').replace(/\s+/g, '').toUpperCase();
         }
 
-        function selectVisitorRfid(tag) {
-            visitorSelectedRfid = tag;
-            visitorRfidInput.value = tag;
-            renderVisitorRfidList();
-            closeVisitorRfidDropdown();
+        function clearVisitorRfidWarning() {
+            visitorRfidWarning.textContent = '';
+            visitorRfidWarning.classList.add('d-none');
+        }
+
+        function showVisitorRfidWarning(message) {
+            visitorRfidWarning.textContent = message;
+            visitorRfidWarning.classList.remove('d-none');
         }
 
         function openVisitorRfidDropdown() {
             visitorRfidDropdown.classList.remove('d-none');
-            renderVisitorRfidList();
+            beginVisitorRegistrationScan();
         }
 
         function closeVisitorRfidDropdown() {
             visitorRfidDropdown.classList.add('d-none');
             scanVisitorRfidInput.classList.add('d-none');
             scanVisitorRfidHint.classList.add('d-none');
+            cancelVisitorRegistrationScan();
+        }
+
+        function commitVisitorRfid(value, owner) {
+            cancelVisitorRegistrationScan();
+
+            const tag = normalizeRfid(value);
+
+            if (!tag) {
+                return false;
+            }
+
+            const assignedOwner = owner || assignedRfidOwners[tag];
+
+            if (assignedOwner) {
+                visitorRfidInput.value = '';
+                scanVisitorRfidInput.value = '';
+                scanVisitorRfidInput.classList.add('d-none');
+                scanVisitorRfidHint.classList.add('d-none');
+                showVisitorRfidWarning(tag + ' is already assigned to ' + assignedOwner + '. Scan another tag.');
+                window.alert('This rfid is already registered');
+                openVisitorRfidDropdown();
+
+                return false;
+            }
+
+            clearVisitorRfidWarning();
+
+            visitorRfidInput.value = tag;
+            scanVisitorRfidInput.value = '';
+            scanVisitorRfidInput.classList.add('d-none');
+            scanVisitorRfidHint.classList.add('d-none');
+            closeVisitorRfidDropdown();
+
+            return true;
+        }
+
+        function scheduleVisitorScanCommit(input) {
+            clearTimeout(visitorScanCommitTimer);
+            visitorScanCommitTimer = setTimeout(function () {
+                if (normalizeRfid(input.value)) {
+                    commitVisitorRfid(input.value);
+                }
+            }, 400);
+        }
+
+        function parseJsonResponse(response) {
+            return response.ok ? response.json() : null;
+        }
+
+        function fetchLatestVisitorRfid() {
+            return fetch(visitorRfidScanLatestUrl, {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            }).then(parseJsonResponse).catch(function () {
+                return null;
+            });
+        }
+
+        function beginVisitorRegistrationScan() {
+            visitorRfidScanWanted = true;
+
+            if (visitorRegistrationArmed || visitorRfidPolling || visitorRfidScanStarting) {
+                return;
+            }
+
+            visitorRfidScanStarting = true;
+
+            fetch(visitorRfidScanModeUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': visitorRfidCsrfToken
+                }
+            }).then(function (response) {
+                visitorRfidScanStarting = false;
+
+                if (!visitorRfidScanWanted) {
+                    if (response.ok) {
+                        visitorRegistrationArmed = true;
+                        cancelVisitorRegistrationScan();
+                    }
+
+                    return;
+                }
+
+                visitorRegistrationArmed = response.ok;
+                startVisitorRfidPolling();
+            }).catch(function () {
+                visitorRfidScanStarting = false;
+
+                if (visitorRfidScanWanted) {
+                    startVisitorRfidPolling();
+                }
+            });
+        }
+
+        function cancelVisitorRegistrationScan() {
+            visitorRfidScanWanted = false;
+            stopVisitorRfidPolling();
+
+            if (!visitorRegistrationArmed) {
+                return;
+            }
+
+            visitorRegistrationArmed = false;
+
+            fetch(visitorRfidScanModeCancelUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': visitorRfidCsrfToken
+                }
+            }).catch(function () {
+                // ignore network errors
+            });
+        }
+
+        function startVisitorRfidPolling() {
+            stopVisitorRfidPolling();
+
+            visitorRfidPolling = true;
+            lastVisitorScanNonce = null;
+
+            visitorRfidPollTimer = setInterval(function () {
+                if (!visitorRfidPolling) {
+                    return;
+                }
+
+                fetchLatestVisitorRfid().then(function (latest) {
+                    if (!visitorRfidPolling || !latest || !latest.uid || latest.nonce === lastVisitorScanNonce) {
+                        return;
+                    }
+
+                    lastVisitorScanNonce = latest.nonce;
+                    visitorRegistrationArmed = false;
+                    stopVisitorRfidPolling();
+                    commitVisitorRfid(latest.uid, latest.owner);
+                });
+            }, 1000);
+        }
+
+        function stopVisitorRfidPolling() {
+            visitorRfidPolling = false;
+
+            if (visitorRfidPollTimer) {
+                clearInterval(visitorRfidPollTimer);
+                visitorRfidPollTimer = null;
+            }
         }
 
         visitorRfidInput.addEventListener('click', openVisitorRfidDropdown);
+        visitorRfidInput.addEventListener('input', function () {
+            clearVisitorRfidWarning();
+            scheduleVisitorScanCommit(visitorRfidInput);
+        });
+        visitorRfidInput.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+            commitVisitorRfid(visitorRfidInput.value);
+        });
+
         visitorRfidToggle.addEventListener('click', function (event) {
             event.preventDefault();
 
@@ -677,10 +816,18 @@
         });
 
         scanVisitorRfidBtn.addEventListener('click', function () {
+            clearVisitorRfidWarning();
             scanVisitorRfidInput.value = '';
             scanVisitorRfidInput.classList.remove('d-none');
             scanVisitorRfidHint.classList.remove('d-none');
             scanVisitorRfidInput.focus();
+            beginVisitorRegistrationScan();
+        });
+
+        scanVisitorRfidInput.addEventListener('input', function () {
+            clearVisitorRfidWarning();
+            cancelVisitorRegistrationScan();
+            scheduleVisitorScanCommit(scanVisitorRfidInput);
         });
 
         scanVisitorRfidInput.addEventListener('keydown', function (event) {
@@ -689,24 +836,8 @@
             }
 
             event.preventDefault();
-
-            const tag = scanVisitorRfidInput.value.replace(/\s+/g, '').toUpperCase();
-
-            if (!tag) {
-                return;
-            }
-
-            if (!visitorAvailableRfids.includes(tag)) {
-                visitorAvailableRfids.unshift(tag);
-            }
-
-            visitorSelectedRfid = tag;
-            visitorRfidInput.value = tag;
-            scanVisitorRfidInput.value = '';
-            scanVisitorRfidInput.classList.add('d-none');
-            scanVisitorRfidHint.classList.add('d-none');
-            visitorRfidList.scrollTop = 0;
-            renderVisitorRfidList();
+            cancelVisitorRegistrationScan();
+            commitVisitorRfid(scanVisitorRfidInput.value);
         });
 
         document.addEventListener('click', function (event) {
@@ -715,17 +846,17 @@
             }
         });
 
-        document.getElementById('visitorForm').addEventListener('reset', function () {
-            visitorSelectedRfid = '';
+        visitorForm.addEventListener('reset', function () {
+            clearTimeout(visitorScanCommitTimer);
+            clearVisitorRfidWarning();
             closeVisitorRfidDropdown();
-            renderVisitorRfidList();
         });
     </script>
 
     <script>
         const refreshIds = [
             'stat-verified', 'stat-visitors', 'stat-denied',
-            'feed-meta', 'live-feed', 'alerts-list', 'summary-box'
+            'live-feed', 'alerts-list', 'summary-box'
         ];
 
         async function refreshDashboard() {
@@ -747,7 +878,13 @@
                 const html = await res.text();
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
+                // Don't close the sent-messages dropdown while the guard is reading it.
+                const sentMessagesMenu = document.getElementById('sent-messages-menu');
+                const sentMessagesOpen = sentMessagesMenu && sentMessagesMenu.classList.contains('show');
+
                 refreshIds.forEach(id => {
+                    if (id === 'summary-box' && sentMessagesOpen) return;
+
                     const fresh = doc.getElementById(id);
                     const current = document.getElementById(id);
                     if (fresh && current) {

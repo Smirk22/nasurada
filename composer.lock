@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2c2f02342510fadc2899de561a1f85eb",
+    "content-hash": "edaf345e47c0d8e90c5b230958b42730",
     "packages": [
         {
             "name": "anhskohbo/no-captcha",
@@ -7378,6 +7378,60 @@
                 }
             ],
             "time": "2026-07-21T15:13:06+00:00"
+        },
+        {
+            "name": "taliffsss/unisms",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/taliffsss/unisms.git",
+                "reference": "708ab9704e842d8500539e21486f72bb72c09ee0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/taliffsss/unisms/zipball/708ab9704e842d8500539e21486f72bb72c09ee0",
+                "reference": "708ab9704e842d8500539e21486f72bb72c09ee0",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-json": "*",
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^3.0",
+                "phpunit/phpunit": "^10.0 || ^9.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Taliffsss\\UniSms\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "taliffsss",
+                    "email": "anthony.naluz15@gmail.com"
+                }
+            ],
+            "description": "PHP client library for the UniSMS API (https://unismsapi.com)",
+            "homepage": "https://github.com/taliffsss/unisms-php",
+            "keywords": [
+                "UniSMS",
+                "api",
+                "client",
+                "philippines",
+                "sms"
+            ],
+            "support": {
+                "issues": "https://github.com/taliffsss/unisms/issues",
+                "source": "https://github.com/taliffsss/unisms/tree/v1.0.0"
+            },
+            "time": "2026-07-02T16:18:41+00:00"
         },
         {
             "name": "tijsverkoyen/css-to-inline-styles",

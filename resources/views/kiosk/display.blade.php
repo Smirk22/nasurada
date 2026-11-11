@@ -196,8 +196,13 @@
                 $('action').textContent = 'UNKNOWN CARD';
                 $('message').textContent = 'This RFID tag is not registered in the system.';
             } else if (scan.is_expired || scan.reason === 'expired_card') {
-                $('action').textContent = 'EXPIRED CARD';
-                $('message').textContent = 'This temporary or visitor card has expired. Please renew it at the registrar.';
+                if (scan.is_visitor) {
+                    $('action').textContent = 'EXPIRED VISITOR ID';
+                    $('message').textContent = 'This visitor ID has expired. Please register again at the guard station.';
+                } else {
+                    $('action').textContent = 'EXPIRED CARD';
+                    $('message').textContent = 'This temporary or visitor card has expired. Please renew it at the registrar.';
+                }
             } else if (scan.reason === 'enrollment_not_confirmed') {
                 $('action').textContent = 'NOT ALLOWED';
                 $('message').textContent = 'Enrollment is not confirmed for the current school year.';

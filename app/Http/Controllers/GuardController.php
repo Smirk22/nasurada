@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\EntryLog;
+use App\Models\SentMessage;
 use App\Models\Student;
+use App\Models\Visitor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,31 +25,11 @@ class GuardController extends Controller
 
         $today = today();
 
-        // Optional "reset" cutoff: when the guard clears the feed, only show
-        // entry logs created after the reset. We use the log ID (not the
-        // updated_at timestamp) so an existing student cannot pop back into
-        // the feed just because their same row was updated after the reset.
-        $feedResetId = session('guard_feed_reset_id');
-        $feedResetAt = session('guard_feed_reset_at');
-
-        // Upgrade a timestamp-only reset (made before ID cutoffs existed) so
-        // already-shown students stay removed even if their row is updated.
-        if ($feedResetId === null && $feedResetAt) {
-            $feedResetId = (int) EntryLog::max('id');
-            session(['guard_feed_reset_id' => $feedResetId]);
-        }
-
-        $liveFeedQuery = EntryLog::whereDate('date', $today)
-            ->with('student')
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id');
-
-        if ($feedResetId !== null) {
-            $liveFeedQuery->where('id', '>', (int) $feedResetId);
-        }
-
         // Live feed: Show today's last scanned students (unique per student/log)
-        $entryLogs = $liveFeedQuery
+        $entryLogs = EntryLog::whereDate('date', $today)
+            ->with(['student', 'visitor'])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
             ->get()
             ->unique(function ($item) {
                 return $item->student_id ? 'student_'.$item->student_id : 'log_'.$item->id;
@@ -77,23 +59,59 @@ class GuardController extends Controller
             ->where('status', 'granted')
             ->count();
 
+        $sentMessagesCount = SentMessage::whereDate('sent_at', $today)->count();
+
+        $sentMessages = SentMessage::whereDate('sent_at', $today)
+            ->with('student')
+            ->orderByDesc('sent_at')
+            ->limit(25)
+            ->get();
+
         // Alerts box: the 5 most recent denied/unknown scans
         $deniedEntries = EntryLog::whereDate('date', $today)
             ->whereIn('status', ['denied', 'unknown', 'expired'])
-            ->with('student')
+            ->with(['student', 'visitor'])
             ->orderByDesc('id')
             ->limit(5)
             ->get()
-            ->map(fn ($log) => [
-                'time' => ($log->student ? ($log->student->first_name.' '.$log->student->last_name) : ('UID: '.($log->card_uid ?? 'Unknown')))
-                    .' at '.Carbon::parse($log->time_in)->timezone(config('app.timezone'))->format('g:i A'),
-            ])
+            ->map(function ($log) {
+                $name = $log->student
+                    ? trim($log->student->first_name.' '.$log->student->last_name)
+                    : ($log->visitor?->visitor_name ?? 'UID: '.($log->card_uid ?? 'Unknown'));
+
+                return [
+                    'time' => $name
+                        .' at '.Carbon::parse($log->time_in)->timezone(config('app.timezone'))->format('g:i A'),
+                ];
+            })
             ->all();
 
-        $visitorsOnCampus = 0; // TODO: connect to a visitors table
+        $visitorsOnCampus = Visitor::active()->count();
 
-        $allStudents = Student::pluck('rfid_tag')->filter()->toArray();
-        $availableRfids = $this->generateAvailableRfids($allStudents);
+        $assignedRfidOwners = Student::query()
+            ->whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->get(['first_name', 'last_name', 'rfid_tag'])
+            ->mapWithKeys(function (Student $student) {
+                $tag = strtoupper(preg_replace('/\s+/', '', $student->rfid_tag));
+
+                return [$tag => trim($student->first_name.' '.$student->last_name)];
+            })
+            ->all();
+
+        $visitorRfidOwners = Visitor::active()
+            ->whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->get(['visitor_name', 'rfid_tag'])
+            ->mapWithKeys(function (Visitor $visitor) {
+                $tag = strtoupper(preg_replace('/\s+/', '', $visitor->rfid_tag));
+
+                return [$tag => $visitor->visitor_name.' (visitor)'];
+            })
+            ->all();
+
+        // Students take precedence when a tag appears in both tables.
+        $assignedRfidOwners += $visitorRfidOwners;
 
         return view('guards.dashboard', [
             'entryLogs' => $entryLogs,
@@ -103,38 +121,11 @@ class GuardController extends Controller
             'totalEntries' => $totalEntries,
             'currentlyIn' => $currentlyIn,
             'currentlyOut' => $currentlyOut,
+            'sentMessagesCount' => $sentMessagesCount,
+            'sentMessages' => $sentMessages,
             'deniedEntries' => $deniedEntries,
-            'availableRfids' => $availableRfids,
-            'feedResetAt' => $feedResetAt,
+            'assignedRfidOwners' => $assignedRfidOwners,
         ]);
-    }
-
-    /**
-     * Clear or restore the live entry feed.
-     * "clear" hides the current scans (new scans still appear).
-     * "restore" removes the cutoff and shows all of today's scans again.
-     */
-    public function resetFeed(Request $request)
-    {
-        $role = strtolower(trim(Auth::user()->role));
-        if ($role !== 'security' && $role !== 'admin') {
-            abort(403);
-        }
-
-        if ($request->input('action') === 'restore') {
-            session()->forget(['guard_feed_reset_id', 'guard_feed_reset_at']);
-
-            return redirect()->route('guard.dashboard')
-                ->with('success', 'Live entry feed restored. Showing all of today\'s scans.');
-        }
-
-        session([
-            'guard_feed_reset_id' => (int) EntryLog::max('id'),
-            'guard_feed_reset_at' => now(),
-        ]);
-
-        return redirect()->route('guard.dashboard')
-            ->with('success', 'Live entry feed reset. Current students are hidden; new scans will appear here.');
     }
 
     /**
@@ -158,7 +149,7 @@ class GuardController extends Controller
 
         // Newest activity first
         $log = EntryLog::whereDate('date', today())
-            ->with('student')
+            ->with(['student', 'visitor'])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->first();
@@ -169,11 +160,25 @@ class GuardController extends Controller
         }
 
         $student = $log->student;
-        $isUnknown = is_null($student) || $log->status === 'unknown';
+        $visitor = $log->visitor;
+        $hasPerson = ! is_null($student) || ! is_null($visitor);
+        $isUnknown = ! $hasPerson || $log->status === 'unknown';
         $isExpired = ! $isUnknown && $log->status === 'expired';
         $isDenied = ! $isUnknown && ! $isExpired && $log->status === 'denied';
         $granted = ! $isUnknown && ! $isDenied && ! $isExpired;
         $isOut = $granted && $log->time_out !== null;
+        $isVisitor = ! $isUnknown && ! is_null($visitor);
+
+        if ($student) {
+            $name = trim($student->first_name.' '.$student->last_name);
+            $number = $student->student_number;
+        } elseif ($visitor) {
+            $name = $visitor->visitor_name;
+            $number = 'Visitor ID: '.$visitor->id_number;
+        } else {
+            $name = 'Unregistered Tag';
+            $number = 'UID: '.($log->card_uid ?? 'N/A');
+        }
 
         return response()->json([
             'scan' => [
@@ -182,13 +187,18 @@ class GuardController extends Controller
                 'reason' => $log->reason,
                 'is_unknown' => $isUnknown,
                 'is_expired' => $isExpired,
+                'is_visitor' => $isVisitor,
                 'card_uid' => $log->card_uid ?? 'Unknown',
-                'action' => $isUnknown ? 'UNKNOWN' : ($isExpired ? 'EXPIRED' : ($isOut ? 'OUT' : 'IN')),
+                'action' => $isUnknown
+                    ? 'UNKNOWN'
+                    : ($isExpired
+                        ? ($isVisitor ? 'EXPIRED VISITOR ID' : 'EXPIRED')
+                        : ($isOut ? 'OUT' : 'IN')),
                 'time' => Carbon::parse($log->time_in)->format('h:i:s A'),
-                'name' => $isUnknown ? 'Unregistered Tag' : ($student->first_name.' '.$student->last_name),
-                'student_number' => $isUnknown ? ('UID: '.($log->card_uid ?? 'N/A')) : $student->student_number,
-                'initial' => $isUnknown ? '⚠️' : strtoupper(substr($student->first_name, 0, 1)),
-                'photo' => (! $isUnknown && $student->photo) ? '/storage/'.ltrim($student->photo, '/') : null,
+                'name' => $isUnknown ? 'Unregistered Tag' : $name,
+                'student_number' => $isUnknown ? ('UID: '.($log->card_uid ?? 'N/A')) : $number,
+                'initial' => $isUnknown ? '⚠️' : strtoupper(substr($name, 0, 1)),
+                'photo' => ($student && $student->photo) ? '/storage/'.ltrim($student->photo, '/') : null,
             ],
         ]);
     }
@@ -203,27 +213,85 @@ class GuardController extends Controller
             'id_type' => 'required|in:drivers_license,passport,national_id',
             'id_number' => 'required|string|max:50',
             'visiting_department' => 'required|string',
-            'pass_duration' => 'required|integer|in:1,2,4,8',
-            'rfid_tag' => 'required|string|unique:students,rfid_tag',
+            'rfid_tag' => 'required|string|max:32',
         ]);
 
-        return redirect()->back()->with('success', 'Visitor pass issued successfully!');
+        $uid = strtoupper(preg_replace('/\s+/', '', $validated['rfid_tag']));
+
+        $tagAlreadyUsedByStudent = Student::whereRaw(
+            "UPPER(REPLACE(rfid_tag, ' ', '')) = ?",
+            [$uid]
+        )->exists();
+
+        if ($tagAlreadyUsedByStudent) {
+            return redirect()->back()->withInput()->withErrors([
+                'rfid_tag' => 'This RFID tag is already assigned to a student.',
+            ]);
+        }
+
+        $visitor = Visitor::whereRaw(
+            "UPPER(REPLACE(rfid_tag, ' ', '')) = ?",
+            [$uid]
+        )->first();
+
+        if ($visitor && $visitor->isActive()) {
+            return redirect()->back()->withInput()->withErrors([
+                'rfid_tag' => 'This RFID tag is already assigned to an active visitor.',
+            ]);
+        }
+
+        $data = [
+            'visitor_name' => $validated['visitor_name'],
+            'id_type' => $validated['id_type'],
+            'id_number' => $validated['id_number'],
+            'visiting_department' => $validated['visiting_department'],
+            'rfid_tag' => $uid,
+            'removed_at' => null,
+        ];
+
+        if ($visitor) {
+            // Reuse the old record when a returned RFID tag is issued again.
+            $visitor->update($data);
+        } else {
+            Visitor::create($data);
+        }
+
+        return redirect()->back()->with('success', 'Visitor registered and added to the Visitor\'s List.');
     }
 
     /**
-     * Generate available RFID tags
+     * Display the active Visitor's List.
      */
-    private function generateAvailableRfids($assignedTags)
+    public function visitors()
     {
-        $availableTags = [];
-
-        for ($i = 1001; $i <= 1050; $i++) {
-            $tag = 'RFID-'.str_pad($i, 4, '0', STR_PAD_LEFT);
-            if (! in_array($tag, $assignedTags)) {
-                $availableTags[] = $tag;
-            }
+        $role = strtolower(trim(Auth::user()->role));
+        if ($role !== 'security' && $role !== 'admin') {
+            abort(403);
         }
 
-        return array_slice($availableTags, 0, 20);
+        return view('guards.visitors', [
+            'visitors' => Visitor::active()->latest()->get(),
+            'removedCount' => Visitor::whereNotNull('removed_at')->count(),
+        ]);
+    }
+
+    /**
+     * Remove a visitor. The record is kept for history, but the RFID tag is no
+     * longer treated as an expired visitor ID when scanned. Removed visitors
+     * are skipped by the scan lookup, and their old tag can be assigned again.
+     */
+    public function visitorDestroy(Visitor $visitor)
+    {
+        $role = strtolower(trim(Auth::user()->role));
+        if ($role !== 'security' && $role !== 'admin') {
+            abort(403);
+        }
+
+        $visitor->update(['removed_at' => now()]);
+
+        return redirect()->back()->with(
+            'success',
+            "{$visitor->visitor_name} was removed. Their RFID tag is now available for a new visitor."
+        );
     }
 }

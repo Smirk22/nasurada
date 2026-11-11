@@ -16,6 +16,7 @@ class Student extends Model
         'course',
         'year_level',
         'section',
+        'phone_number',
         'rfid_tag',
         'photo',
         'status',

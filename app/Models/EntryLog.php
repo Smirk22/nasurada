@@ -11,6 +11,7 @@ class EntryLog extends Model
 
     protected $fillable = [
         'student_id',
+        'visitor_id',
         'card_uid',
         'date',
         'time_in',
@@ -22,5 +23,10 @@ class EntryLog extends Model
     public function student()
     {
         return $this->belongsTo(Student::class);
+    }
+
+    public function visitor()
+    {
+        return $this->belongsTo(Visitor::class);
     }
 }

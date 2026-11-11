@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EntryLogController;
 use App\Http\Controllers\GuardController;
 use App\Http\Controllers\RegistrarController;
+use App\Http\Controllers\RfidController;
 use App\Http\Controllers\TwoFactorSetupController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,11 @@ Route::middleware(['auth', 'role:Admin,Registrar'])->group(function () {
     Route::post('/registrar/students/{student}/photo', [RegistrarController::class, 'updatePhoto'])->name('registrar.students.photo');
     Route::delete('/registrar/students/{student}', [RegistrarController::class, 'destroy'])->name('registrar.students.destroy');
     Route::post('/registrar/students/unenroll-all', [RegistrarController::class, 'unenrollAll'])->name('registrar.students.unenrollAll');
+
+    // Registration scan mode: taps are captured for enrollment, not logged as gate entries.
+    Route::post('/registrar/rfid/scan-mode', [RfidController::class, 'beginRegistration'])->name('registrar.rfid.scan-mode');
+    Route::post('/registrar/rfid/scan-mode/cancel', [RfidController::class, 'endRegistration'])->name('registrar.rfid.scan-mode.cancel');
+    Route::get('/registrar/rfid/scan-latest', [RfidController::class, 'latestRegistrationScan'])->name('registrar.rfid.scan-latest');
 });
 
 // Entry Logs Routes (any staff role)
@@ -60,11 +66,18 @@ Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () 
 
 // Guard Routes (security and admin)
 Route::middleware(['auth', 'role:Admin,Security'])->prefix('Security')->group(function () {
-    Route::post('/dashboard/reset-feed', [GuardController::class, 'resetFeed'])->name('guard.feed.reset');
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
+    Route::get('/visitors', [GuardController::class, 'visitors'])->name('guard.visitors.index');
+    Route::delete('/visitors/{visitor}', [GuardController::class, 'visitorDestroy'])->name('guard.visitors.destroy');
     Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk');
     Route::get('/kiosk/latest', [GuardController::class, 'latestScan'])->name('guard.kiosk.latest');
+
+    // Visitor registration scan mode: taps are captured for the visitor form,
+    // not logged as gate entries in the live feed.
+    Route::post('/rfid/scan-mode', [RfidController::class, 'beginVisitorRegistration'])->name('guard.rfid.scan-mode');
+    Route::post('/rfid/scan-mode/cancel', [RfidController::class, 'endVisitorRegistration'])->name('guard.rfid.scan-mode.cancel');
+    Route::get('/rfid/scan-latest', [RfidController::class, 'latestVisitorRegistrationScan'])->name('guard.rfid.scan-latest');
 });
 
 require __DIR__.'/settings.php';

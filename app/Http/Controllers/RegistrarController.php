@@ -45,9 +45,6 @@ class RegistrarController extends Controller
 
         $students = $query->get();
 
-        $assignedRfids = Student::pluck('rfid_tag')->filter()->toArray();
-        $availableRfids = $this->generateAvailableRfids($assignedRfids);
-
         $assignedRfidOwners = Student::query()
             ->whereNotNull('rfid_tag')
             ->where('rfid_tag', '!=', '')
@@ -59,25 +56,7 @@ class RegistrarController extends Controller
             })
             ->all();
 
-        return view('registrar.students', compact('students', 'availableRfids', 'assignedRfidOwners'));
-    }
-
-    /**
-     * Generate the pool of RFID tags that are not assigned to any student.
-     */
-    private function generateAvailableRfids(array $assignedTags): array
-    {
-        $availableTags = [];
-
-        for ($i = 1001; $i <= 1050; $i++) {
-            $tag = 'RFID-'.str_pad((string) $i, 4, '0', STR_PAD_LEFT);
-
-            if (! in_array($tag, $assignedTags, true)) {
-                $availableTags[] = $tag;
-            }
-        }
-
-        return $availableTags;
+        return view('registrar.students', compact('students', 'assignedRfidOwners'));
     }
 
     public function store(Request $request)
@@ -101,6 +80,9 @@ class RegistrarController extends Controller
             // Section - Only predefined sections
             'section' => 'required|in:S1B1,S1B2,S4B1,S7C3',
 
+            // Phone Number - Optional, Philippine mobile number (e.g., 09171234567 or +639171234567)
+            'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^(?:\+?63|0)9\d{9}$/'],
+
             // RFID Tag - Optional, unique
             'rfid_tag' => 'nullable|string|unique:students,rfid_tag',
         ], [
@@ -111,6 +93,7 @@ class RegistrarController extends Controller
             'course.in' => 'Only BSIT course is available for this pilot program.',
             'year_level.in' => 'Year Level must be between 1st and 4th year.',
             'section.in' => 'Selected section is not valid. Only predefined sections are allowed.',
+            'phone_number.regex' => 'Phone Number must be a valid PH mobile number (e.g., 09171234567 or +639171234567).',
             'rfid_tag.unique' => 'This RFID tag is already assigned to another student.',
         ]);
 
@@ -137,6 +120,7 @@ class RegistrarController extends Controller
             'course' => 'required|in:BSIT',
             'year_level' => 'required|integer|in:1,2,3,4',
             'section' => 'required|in:S1B1,S1B2,S4B1,S7C3',
+            'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^(?:\+?63|0)9\d{9}$/'],
             'rfid_tag' => 'nullable|string|unique:students,rfid_tag,'.$student->id,
             'status' => 'required|string',
         ], [
@@ -147,6 +131,7 @@ class RegistrarController extends Controller
             'course.in' => 'Only BSIT course is available for this pilot program.',
             'year_level.in' => 'Year Level must be between 1st and 4th year.',
             'section.in' => 'Selected section is not valid. Only predefined sections are allowed.',
+            'phone_number.regex' => 'Phone Number must be a valid PH mobile number (e.g., 09171234567 or +639171234567).',
             'rfid_tag.unique' => 'This RFID tag is already assigned to another student.',
         ]);
 
