@@ -104,8 +104,10 @@ Function IsServerUp()
     http.Open "GET", healthUrl, False
     http.Send
 
+    ' Any HTTP response means a server is already listening on the port.
+    ' Do not start a second one just because the app returned an error page.
     If Err.Number = 0 Then
-        If http.Status = 200 Or http.Status = 302 Then
+        If http.Status > 0 Then
             IsServerUp = True
         End If
     End If

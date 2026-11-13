@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\EntryLogController;
+use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\GuardController;
 use App\Http\Controllers\RegistrarController;
 use App\Http\Controllers\RfidController;
@@ -23,6 +24,12 @@ Route::post('/two-factor-verify/cancel', [AuthController::class, 'cancelTwoFacto
 
 // Use Fortify's logout to avoid route conflicts; AuthController::logout still available if needed
 
+// Forced password change after temporary password login (one-time use)
+Route::middleware(['auth'])->group(function () {
+    Route::get('/password/change-required', [ForcedPasswordChangeController::class, 'edit'])->name('password.force-change');
+    Route::post('/password/change-required', [ForcedPasswordChangeController::class, 'update'])->name('password.force-change.update');
+});
+
 // Two-factor authentication management (any signed-in staff member)
 Route::middleware(['auth'])->group(function () {
     Route::get('/settings/two-factor', [TwoFactorSetupController::class, 'edit'])->name('two-factor.setup');
@@ -37,6 +44,7 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::get('/adashboard', [AdminController::class, 'dashboard'])->name('adashboard');
     Route::post('/admin/users', [AdminController::class, 'storeUser'])->name('admin.users.store');
     Route::put('/admin/users/{user}', [AdminController::class, 'updateUser'])->name('admin.users.update');
+    Route::post('/admin/users/{user}/temporary-password', [AdminController::class, 'generateTemporaryPassword'])->name('admin.users.temporary-password');
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
 });
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureTemporaryPasswordChanged;
 use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -25,15 +26,23 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             PreventBackHistory::class,
+            EnsureTemporaryPasswordChanged::class,
         ]);
 
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'password.changed' => EnsureTemporaryPasswordChanged::class,
         ]);
 
         // Where logged-in users are sent when they open a guest-only page (like /login)
         $middleware->redirectUsersTo(function () {
-            return match (auth()->user()?->role) {
+            $user = auth()->user();
+
+            if ($user && filled($user->temporary_password)) {
+                return route('password.force-change');
+            }
+
+            return match ($user?->role) {
                 'Admin'     => route('adashboard'),
                 'Registrar' => route('rdashboard'),
                 'Security'  => route('guard.dashboard'),

@@ -8,6 +8,8 @@ use App\Models\Student;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
 {
@@ -49,7 +51,7 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|unique:accounts,username',
             'email' => 'required|email|unique:accounts,email',
-            'password' => 'required|min:6',
+            'password' => ['required', 'string', Password::default()],
             'role' => 'required|string',
         ]);
 
@@ -76,10 +78,6 @@ class AdminController extends Controller
             'role' => 'required|string',
         ]);
 
-        if ($request->filled('password')) {
-            $validated['password'] = Hash::make($request->password);
-        }
-
         $user->update($validated);
 
         ActivityLog::create([
@@ -90,6 +88,28 @@ class AdminController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'User account updated!');
+    }
+
+    public function generateTemporaryPassword(User $user)
+    {
+        $temporaryPassword = Str::password(16);
+
+        $user->forceFill([
+            'password' => Hash::make($temporaryPassword),
+            'temporary_password' => $temporaryPassword,
+            'failed_login_attempts' => 0,
+            'locked_until' => null,
+            'must_reset_password' => false,
+        ])->save();
+
+        ActivityLog::create([
+            'user_name' => auth()->user()->username ?? 'Admin',
+            'role' => 'Admin',
+            'action' => 'Generated Temporary Password',
+            'details' => "Generated temporary password for '{$user->username}'",
+        ]);
+
+        return redirect()->back()->with('success', "Temporary password generated for {$user->email}. It is shown in the Temp Password column.");
     }
 
     public function destroyUser(User $user)

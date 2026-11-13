@@ -16,6 +16,10 @@ class RoleMiddleware
             return redirect()->route('login');
         }
 
+        if (filled($user->temporary_password)) {
+            return redirect()->route('password.force-change');
+        }
+
         if (!in_array($user->role, $roles)) {
             return match ($user->role) {
                 'Admin'     => redirect()->route('adashboard'),
