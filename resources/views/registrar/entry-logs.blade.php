@@ -121,22 +121,40 @@
 
             <!-- Modal Content -->
             <div class="p-6">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
-                            <th class="p-3">Student #</th>
-                            <th class="p-3">Name</th>
-                            <th class="p-3">Year / Section</th>
-                            <th class="p-3">Date</th>
-                            <th class="p-3">Time In</th>
-                            <th class="p-3">Time Out</th>
-                            <th class="p-3">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modalTableBody" class="divide-y divide-gray-100 text-sm">
-                        <!-- Populated by JavaScript -->
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-600 uppercase font-semibold">
+                                <th class="p-3">Student #</th>
+                                <th class="p-3">Name</th>
+                                <th class="p-3">Year / Section</th>
+                                <th class="p-3">Date</th>
+                                <th class="p-3">Time In</th>
+                                <th class="p-3">Time Out</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalTableBody" class="divide-y divide-gray-100 text-sm">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Pagination footer --}}
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-4 mt-2 border-t border-gray-100">
+                    <p id="modalRange" class="text-xs text-gray-500 mb-0">Loading entries...</p>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="prevPageBtn" onclick="changePage(-1)"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            &lsaquo; Prev
+                        </button>
+                        <span id="pageInfo" class="text-xs font-semibold text-gray-700 whitespace-nowrap">Page 1 of 1</span>
+                        <button type="button" id="nextPageBtn" onclick="changePage(1)"
+                                class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed">
+                            Next &rsaquo;
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -149,6 +167,11 @@
         let currentSection = null;
         let currentYear = null;
         let modalTimer = null;
+
+        // Pagination state for the section modal (server-side pagination)
+        let currentPage = 1;
+        let lastPage = 1;
+        let totalEntries = 0;
 
         // Toggle Year Sections
         function toggleYear(yearNum) {
@@ -169,18 +192,23 @@
             document.getElementById('modalTitle').textContent = `Year ${year} - Section ${section}`;
             document.getElementById('sectionModal').classList.remove('hidden');
 
+            currentPage = 1;
+            lastPage = 1;
+            totalEntries = 0;
+
             loadSectionLogs();
 
             clearInterval(modalTimer);
             modalTimer = setInterval(loadSectionLogs, 4000);
         }
 
-        // Fetch the selected section's entries (year-aware and always ordered newest first)
+        // Fetch the selected section's entries (year-aware and always ordered newest first).
+        // The endpoint paginates, so only one page is transferred and rendered at a time.
         async function loadSectionLogs() {
             if (!currentSection) return;
 
             const tableBody = document.getElementById('modalTableBody');
-            const params = new URLSearchParams({ year: currentYear });
+            const params = new URLSearchParams({ year: currentYear, page: currentPage });
 
             const date = document.getElementById('filterDate').value;
             if (date) params.set('date', date);
@@ -195,7 +223,26 @@
 
                 if (!response.ok) throw new Error('HTTP ' + response.status);
 
-                const data = await response.json();
+                const payload = await response.json();
+
+                // Laravel paginator response: { data: [...], current_page, last_page, total, ... }
+                const data = Array.isArray(payload) ? payload : (payload.data || []);
+                const isPaginated = !Array.isArray(payload) && typeof payload.last_page === 'number';
+
+                if (isPaginated) {
+                    lastPage = Math.max(1, payload.last_page);
+                    totalEntries = payload.total || 0;
+
+                    // Entries can disappear while the modal is open (date filter,
+                    // deleted records). Step back to the last real page.
+                    if (currentPage > lastPage) {
+                        currentPage = lastPage;
+
+                        return loadSectionLogs();
+                    }
+                }
+
+                renderPagination(isPaginated ? payload : null);
 
                 if (data.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-400">No entry logs found for this section yet.</td></tr>';
@@ -241,6 +288,43 @@
             return '<span class="px-3 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full">IN</span>';
         }
 
+        // Update the "Showing x–y of z" summary and the Prev / Next buttons.
+        function renderPagination(payload) {
+            const range = document.getElementById('modalRange');
+            const info = document.getElementById('pageInfo');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+
+            if (!range || !info || !prevBtn || !nextBtn) return;
+
+            if (payload) {
+                const total = payload.total || 0;
+                const from = payload.from || 0;
+                const to = payload.to || 0;
+
+                range.textContent = total === 0
+                    ? 'No entries'
+                    : `Showing ${from}–${to} of ${total} ${total === 1 ? 'entry' : 'entries'}`;
+            } else {
+                range.textContent = `${totalEntries} ${totalEntries === 1 ? 'entry' : 'entries'}`;
+            }
+
+            info.textContent = `Page ${currentPage} of ${lastPage}`;
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= lastPage;
+        }
+
+        function changePage(delta) {
+            if (!currentSection) return;
+
+            const target = Math.min(lastPage, Math.max(1, currentPage + delta));
+
+            if (target === currentPage) return;
+
+            currentPage = target;
+            loadSectionLogs();
+        }
+
         // Close Modal
         function closeSectionModal() {
             document.getElementById('sectionModal').classList.add('hidden');
@@ -248,6 +332,9 @@
             modalTimer = null;
             currentSection = null;
             currentYear = null;
+            currentPage = 1;
+            lastPage = 1;
+            totalEntries = 0;
         }
 
         // Format Date
@@ -270,6 +357,8 @@
 
         // Filter by Date (applies to the open section, if any)
         function filterByDate() {
+            currentPage = 1;
+
             if (currentSection) {
                 loadSectionLogs();
             }
@@ -278,6 +367,8 @@
 
         function clearDateFilter() {
             document.getElementById('filterDate').value = '';
+            currentPage = 1;
+
             if (currentSection) {
                 loadSectionLogs();
             }

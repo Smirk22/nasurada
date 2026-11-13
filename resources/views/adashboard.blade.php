@@ -25,8 +25,8 @@
         <div class="flex-1 flex flex-col min-w-0">
             <!-- Top Header -->
             <header class="bg-white shadow px-8 py-6 border-b border-gray-200 shrink-0">
-                <h1 class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-                <p class="text-sm text-gray-500 mt-1">System administration and staff account overview.</p>
+                <h1 id="adminPageTitle" class="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+                <p id="adminPageSubtitle" class="text-sm text-gray-500 mt-1">System administration and staff account overview.</p>
             </header>
 
             <!-- Main Content -->
@@ -38,12 +38,14 @@
                     </div>
                 @endif
 
-                @if($errors->any())
+                @if($errors->any() && ! $errors->has('backup'))
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl shadow-sm shrink-0">
                         {{ $errors->first() }}
                     </div>
                 @endif
 
+                <!-- Overview tab -->
+                <div id="admin-tab-overview" class="flex flex-col gap-4">
                 <!-- Summary Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
                     <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
@@ -213,6 +215,138 @@
                         @endforelse
                     </div>
                 </div>
+                </div>
+
+                <!-- Backups tab -->
+                <div id="admin-tab-backups" class="hidden flex flex-col gap-4">
+                <!-- Database Backups -->
+                <div id="backups" class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-4">
+                    @php($lastBackup = $backupFiles[0] ?? null)
+
+                    <div class="flex flex-wrap justify-between items-start gap-3">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-lg font-bold text-gray-800">Database Backups</h2>
+                                @if (($backupStatus ?? 'never') === 'fresh')
+                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-green-100 text-green-800">Up to date</span>
+                                @elseif (($backupStatus ?? 'never') === 'stale')
+                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-orange-100 text-orange-800">Backup overdue</span>
+                                @else
+                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-800">No backup yet</span>
+                                @endif
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                ZIP snapshots of the SQLite database
+                                @if (!empty($backupIncludesPhotos)), student photos @endif
+                                @if (!empty($backupIncludesEnv)), and .env @endif.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onclick="openBackupCreateModal()"
+                            class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
+                        >
+                            + Backup Now
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                            <p class="text-[11px] font-semibold uppercase text-gray-500">Last Backup</p>
+                            <p class="mt-1 text-sm font-bold text-gray-800">
+                                {{ $lastBackup ? $lastBackup['created_at']->diffForHumans() : 'Never' }}
+                            </p>
+                            <p class="text-[11px] text-gray-500">
+                                {{ $lastBackup ? $lastBackup['created_at']->format('M j, Y g:i A') : 'Create your first backup' }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                            <p class="text-[11px] font-semibold uppercase text-gray-500">Storage Used</p>
+                            <p class="mt-1 text-sm font-bold text-gray-800">{{ $backupTotalSize }}</p>
+                            <p class="text-[11px] text-gray-500">{{ count($backupFiles) }} archive(s) saved</p>
+                        </div>
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                            <p class="text-[11px] font-semibold uppercase text-gray-500">Retention</p>
+                            <p class="mt-1 text-sm font-bold text-gray-800">Keep {{ $backupKeep ?? (int) config('backup.keep', 14) }} newest</p>
+                            <p class="text-[11px] text-gray-500">Older archives are pruned automatically</p>
+                        </div>
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                            <p class="text-[11px] font-semibold uppercase text-gray-500">Database</p>
+                            <p class="mt-1 text-sm font-bold text-gray-800 uppercase">{{ $backupDriver ?? config('database.default') }}</p>
+                            <p class="text-[11px] text-gray-500">Automatic backups support SQLite</p>
+                        </div>
+                    </div>
+
+                    @if ($errors->has('backup'))
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">
+                            {{ $errors->first('backup') }}
+                        </div>
+                    @endif
+
+                    @if(count($backupFiles))
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50">
+                                    <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
+                                        <th class="p-3">Created</th>
+                                        <th class="p-3">File</th>
+                                        <th class="p-3">Size</th>
+                                        <th class="p-3 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 text-sm">
+                                    @foreach($backupFiles as $backup)
+                                        <tr class="hover:bg-gray-50 transition">
+                                            <td class="p-3 text-gray-700 whitespace-nowrap">
+                                                <div>{{ $backup['created_at']->format('M j, Y g:i A') }}</div>
+                                                <div class="text-[11px] text-gray-400">{{ $backup['created_at']->diffForHumans() }}</div>
+                                            </td>
+                                            <td class="p-3 font-mono text-xs text-gray-600 break-all">{{ $backup['name'] }}</td>
+                                            <td class="p-3 text-gray-600 whitespace-nowrap">{{ $backup['size_human'] }}</td>
+                                            <td class="p-3 text-center whitespace-nowrap">
+                                                <div class="inline-flex items-center gap-2">
+                                                    <a href="{{ route('admin.backups.download', $backup['name']) }}" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Download</a>
+                                                    <button
+                                                        type="button"
+                                                        class="text-ieti-green hover:text-green-800 text-xs font-semibold"
+                                                        onclick="openBackupRestoreModal({{ json_encode($backup['name']) }})"
+                                                    >Restore</button>
+                                                    <button
+                                                        type="button"
+                                                        class="text-red-600 hover:text-red-800 text-xs font-semibold"
+                                                        onclick="openBackupDeleteModal({{ json_encode($backup['name']) }})"
+                                                    >Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="text-center border border-dashed border-gray-200 rounded-xl py-8 px-4">
+                            <p class="text-sm font-semibold text-gray-700">No backups yet</p>
+                            <p class="text-xs text-gray-400 mt-1">Create a snapshot before making major changes or at the end of each school day.</p>
+                            <button type="button" onclick="openBackupCreateModal()" class="mt-3 text-xs font-semibold text-ieti-green hover:underline">
+                                Create first backup
+                            </button>
+                        </div>
+                    @endif
+
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
+                        <p>
+                            Backups are stored on this computer only, in
+                            <code class="font-mono">{{ $backupDirectory }}</code>.
+                            Download copies regularly to an external drive or cloud folder.
+                        </p>
+                        <p>
+                            Restore from this panel replaces the live database (a safety snapshot is saved first).
+                            For a daily 11:00 PM backup, run <code class="font-mono">install-backup-task.bat</code> once
+                            or keep <code class="font-mono">php artisan schedule:work</code> running.
+                        </p>
+                    </div>
+                </div>
+                </div>
 
             </main>
         </div>
@@ -272,6 +406,72 @@
         </div>
     </div>
 
+    <!-- Backup Create Confirm Modal -->
+    <div id="backupCreateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800">Create backup now?</h3>
+            <p class="text-sm text-gray-600 mt-2">
+                This will create a ZIP snapshot of the live database
+                @if (!empty($backupIncludesPhotos)), student photos @endif
+                @if (!empty($backupIncludesEnv)), and .env @endif.
+                It may take a moment.
+            </p>
+            <form id="backupCreateForm" action="{{ route('admin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5" onsubmit="return lockBackupSubmit(this, 'Creating…')">
+                @csrf
+                <button type="button" onclick="closeModal('backupCreateModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Create Backup</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Backup Delete Confirm Modal -->
+    <div id="backupDeleteModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800">Delete this backup?</h3>
+            <p class="text-sm text-gray-600 mt-2">
+                <code id="backupDeleteName" class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"></code>
+                will be permanently removed. This cannot be undone.
+            </p>
+            <form id="backupDeleteForm" method="POST" class="flex justify-end gap-2 mt-5">
+                @csrf
+                @method('DELETE')
+                <button type="button" onclick="closeModal('backupDeleteModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button type="submit" class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Delete Backup</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Backup Restore Confirm Modal -->
+    <div id="backupRestoreModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 class="text-lg font-bold text-gray-800">Restore from backup?</h3>
+            <p class="text-sm text-gray-600 mt-2">
+                This replaces the live database with
+                <code id="backupRestoreName" class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"></code>.
+                A safety snapshot of the current database is saved first. You will be signed out after restore.
+            </p>
+            <form id="backupRestoreForm" method="POST" class="space-y-3 mt-4" onsubmit="return lockBackupSubmit(this, 'Restoring…')">
+                @csrf
+                <div>
+                    <label for="backupRestoreConfirmation" class="text-xs font-semibold text-gray-600">Type <span class="font-mono">RESTORE</span> to confirm</label>
+                    <input
+                        type="text"
+                        id="backupRestoreConfirmation"
+                        name="confirmation"
+                        required
+                        autocomplete="off"
+                        class="mt-1 w-full border p-2 rounded text-sm font-mono"
+                        placeholder="RESTORE"
+                    >
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('backupRestoreModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Restore System</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Generate Temporary Password Confirm Modal -->
     <div id="generateTempPasswordModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
@@ -303,6 +503,31 @@
     <script>
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function lockBackupSubmit(form, label) {
+            const button = form.querySelector('button[type="submit"]');
+            if (button) {
+                button.disabled = true;
+                button.textContent = label || 'Please wait…';
+            }
+            return true;
+        }
+        function openBackupCreateModal() {
+            openModal('backupCreateModal');
+        }
+        function openBackupDeleteModal(fileName) {
+            document.getElementById('backupDeleteName').textContent = fileName;
+            document.getElementById('backupDeleteForm').action = '/admin/backups/' + encodeURIComponent(fileName);
+            openModal('backupDeleteModal');
+        }
+        function openBackupRestoreModal(fileName) {
+            document.getElementById('backupRestoreName').textContent = fileName;
+            document.getElementById('backupRestoreForm').action = '/admin/backups/' + encodeURIComponent(fileName) + '/restore';
+            document.getElementById('backupRestoreConfirmation').value = '';
+            openModal('backupRestoreModal');
+            setTimeout(function () {
+                document.getElementById('backupRestoreConfirmation').focus();
+            }, 50);
+        }
         function markTempPasswordCopied(button) {
             const original = button.getAttribute('data-original-label') || button.textContent.trim() || 'Copy';
             button.setAttribute('data-original-label', original);
@@ -406,6 +631,60 @@
 
             openModal('editUserModal');
         }
+
+        function setAdminTab(tab) {
+            const overview = document.getElementById('admin-tab-overview');
+            const backups = document.getElementById('admin-tab-backups');
+            const title = document.getElementById('adminPageTitle');
+            const subtitle = document.getElementById('adminPageSubtitle');
+            const showBackups = tab === 'backups';
+
+            if (overview) overview.classList.toggle('hidden', showBackups);
+            if (backups) backups.classList.toggle('hidden', !showBackups);
+
+            if (title) title.textContent = showBackups ? 'Database Backups' : 'Admin Dashboard';
+            if (subtitle) {
+                subtitle.textContent = showBackups
+                    ? 'Create, download, restore, and manage system backup archives.'
+                    : 'System administration and staff account overview.';
+            }
+
+            document.querySelectorAll('.admin-tab-link').forEach(function (link) {
+                const active = link.getAttribute('data-admin-tab') === tab;
+                link.classList.toggle('bg-green-700', active);
+            });
+
+            if (showBackups && window.location.hash !== '#backups') {
+                history.replaceState(null, '', '#backups');
+            } else if (!showBackups && (window.location.hash === '#backups' || window.location.hash === '#overview')) {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+        }
+
+        function syncAdminTabFromHash() {
+            setAdminTab(window.location.hash === '#backups' ? 'backups' : 'overview');
+        }
+
+        document.querySelectorAll('.admin-tab-link').forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                if (!document.getElementById('admin-tab-overview')) return;
+
+                const tab = link.getAttribute('data-admin-tab');
+                if (tab !== 'overview' && tab !== 'backups') return;
+
+                event.preventDefault();
+                if (tab === 'backups') {
+                    history.pushState(null, '', '#backups');
+                } else {
+                    history.pushState(null, '', window.location.pathname + window.location.search);
+                }
+                setAdminTab(tab);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        window.addEventListener('hashchange', syncAdminTabFromHash);
+        syncAdminTabFromHash();
 
         // Reload if the browser restores this page from its back/forward cache
         window.addEventListener('pageshow', function (e) {

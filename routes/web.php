@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BackupController;
 use App\Http\Controllers\EntryLogController;
 use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\GuardController;
@@ -46,6 +47,18 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::put('/admin/users/{user}', [AdminController::class, 'updateUser'])->name('admin.users.update');
     Route::post('/admin/users/{user}/temporary-password', [AdminController::class, 'generateTemporaryPassword'])->name('admin.users.temporary-password');
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
+
+    // Database backups
+    Route::post('/admin/backups', [BackupController::class, 'store'])->name('admin.backups.store');
+    Route::get('/admin/backups/{file}', [BackupController::class, 'download'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('admin.backups.download');
+    Route::post('/admin/backups/{file}/restore', [BackupController::class, 'restore'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('admin.backups.restore');
+    Route::delete('/admin/backups/{file}', [BackupController::class, 'destroy'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('admin.backups.destroy');
 });
 
 // Registrar Routes (registrar and admin)

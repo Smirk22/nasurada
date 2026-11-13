@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\EntryLog;
 use App\Models\Student;
 use App\Models\User;
+use App\Services\BackupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
 {
-    public function dashboard()
+    public function dashboard(BackupService $backups)
     {
         $totalUsers = User::count();
         $totalStudents = Student::count();
@@ -32,6 +33,21 @@ class AdminController extends Controller
         $users = User::all();
         $activities = ActivityLog::latest()->get();
 
+        $backupFiles = $backups->all();
+        $backupTotalSize = $backups->totalSizeHuman();
+        $backupDirectory = $backups->directory();
+        $backupKeep = (int) config('backup.keep', 14);
+        $backupIncludesPhotos = (bool) config('backup.include_photos', true);
+        $backupIncludesEnv = (bool) config('backup.include_env', true);
+        $backupDriver = (string) config('database.default');
+        $lastBackup = $backupFiles[0] ?? null;
+        $backupStatus = 'never';
+
+        if ($lastBackup) {
+            $hours = $lastBackup['created_at']->diffInHours(now());
+            $backupStatus = $hours <= 36 ? 'fresh' : 'stale';
+        }
+
         return view('adashboard', compact(
             'totalUsers',
             'totalStudents',
@@ -41,7 +57,15 @@ class AdminController extends Controller
             'validScans',
             'invalidScans',
             'users',
-            'activities'
+            'activities',
+            'backupFiles',
+            'backupTotalSize',
+            'backupDirectory',
+            'backupKeep',
+            'backupIncludesPhotos',
+            'backupIncludesEnv',
+            'backupDriver',
+            'backupStatus'
         ));
     }
 

@@ -140,22 +140,27 @@
             <div class="card page-card mb-4">
                 <div class="card-body p-3">
                     <form method="GET" action="{{ route('registrar.students') }}" class="row g-2 align-items-center">
-                        <div class="col-12 col-md">
+                        <div class="col-12 col-lg">
                             <div class="input-group">
                                 <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
                                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Search Name or Student #..." class="form-control">
                             </div>
                         </div>
-                        <div class="col-8 col-md-3">
-                            <select name="year" class="form-select">
-                                <option value="All Years">All Years</option>
+                        <div class="col-6 col-md-3 col-lg-2">
+                            <select name="year" id="filter_year" class="form-select">
+                                <option value="All Years" {{ request('year', 'All Years') === 'All Years' ? 'selected' : '' }}>All Years</option>
                                 <option value="1" {{ request('year') == '1' ? 'selected' : '' }}>Year 1</option>
                                 <option value="2" {{ request('year') == '2' ? 'selected' : '' }}>Year 2</option>
                                 <option value="3" {{ request('year') == '3' ? 'selected' : '' }}>Year 3</option>
                                 <option value="4" {{ request('year') == '4' ? 'selected' : '' }}>Year 4</option>
                             </select>
                         </div>
-                        <div class="col-4 col-md-auto">
+                        <div class="col-6 col-md-3 col-lg-2">
+                            <select name="section" id="filter_section" class="form-select">
+                                <option value="All Sections">All Sections</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-auto">
                             <button type="submit" class="btn btn-dark fw-semibold w-100">
                                 <i class="bi bi-funnel me-1"></i> Filter
                             </button>
@@ -242,6 +247,20 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Pagination footer --}}
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 px-4 py-3 border-top bg-white">
+                    <p class="small text-muted mb-0">
+                        @if ($students->total() > 0)
+                            Showing <strong>{{ $students->firstItem() }}</strong>–<strong>{{ $students->lastItem() }}</strong>
+                            of <strong>{{ $students->total() }}</strong> student record{{ $students->total() === 1 ? '' : 's' }}
+                        @else
+                            No student records found.
+                        @endif
+                    </p>
+
+                    {{ $students->onEachSide(1)->links('pagination::bootstrap-5') }}
+                </div>
             </div>
 
         </main>
@@ -261,8 +280,18 @@
                         <!-- Student Number -->
                         <div class="mb-3">
                             <label class="form-label small fw-semibold text-secondary" for="add_student_number">Student Number (3 Letters + 8 Numbers)</label>
-                            <input type="text" name="student_number" id="add_student_number" placeholder="e.g., MAR87654320" required class="form-control text-uppercase">
-                            <div class="invalid-feedback d-block text-danger small hidden" id="add_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</div>
+                            <input
+                                type="text"
+                                name="student_number"
+                                id="add_student_number"
+                                placeholder="{{ $latestStudentNumber ? 'e.g., '.$latestStudentNumber : 'e.g., MAR87654320' }}"
+                                required
+                                class="form-control text-uppercase"
+                            >
+                            @if ($latestStudentNumber)
+                                <div class="form-text">Most recent student number entered: <span class="font-monospace fw-semibold">{{ $latestStudentNumber }}</span></div>
+                            @endif
+                            <div class="text-danger small hidden" id="add_student_error">Must be 3 letters followed by 8 numbers (e.g., {{ $latestStudentNumber ?: 'MAR87654320' }})</div>
                         </div>
 
                         <!-- First & Last Name -->
@@ -302,12 +331,8 @@
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="add_section">Section</label>
-                                <select name="section" id="add_section" required class="form-select">
-                                    <option value="">-- Select Section --</option>
-                                    <option value="S1B1">S1B1</option>
-                                    <option value="S1B2">S1B2</option>
-                                    <option value="S4B1">S4B1</option>
-                                    <option value="S7C3">S7C3</option>
+                                <select name="section" id="add_section" required class="form-select" disabled>
+                                    <option value="">-- Select Year First --</option>
                                 </select>
                             </div>
                         </div>
@@ -406,12 +431,8 @@
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="edit_section">Section</label>
-                                <select id="edit_section" name="section" required class="form-select">
-                                    <option value="">-- Select Section --</option>
-                                    <option value="S1B1">S1B1</option>
-                                    <option value="S1B2">S1B2</option>
-                                    <option value="S4B1">S4B1</option>
-                                    <option value="S7C3">S7C3</option>
+                                <select id="edit_section" name="section" required class="form-select" disabled>
+                                    <option value="">-- Select Year First --</option>
                                 </select>
                             </div>
                         </div>
@@ -696,6 +717,93 @@
             }
         }
 
+        const SECTIONS_BY_YEAR = {
+            '1': ['S1A1', 'S1B1', 'S1C1'],
+            '2': ['S3B1', 'S3C1'],
+            '3': ['S5B2', 'S5C2'],
+            '4': ['S7C3', 'S7C4'],
+        };
+
+        const ALL_SECTIONS = Object.values(SECTIONS_BY_YEAR).flat();
+
+        function populateSectionOptions(yearSelect, sectionSelect, selectedSection) {
+            const year = String(yearSelect.value || '');
+            const sections = SECTIONS_BY_YEAR[year] || [];
+
+            sectionSelect.innerHTML = '';
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = year ? '-- Select Section --' : '-- Select Year First --';
+            sectionSelect.appendChild(placeholder);
+
+            sections.forEach(function (section) {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                sectionSelect.appendChild(option);
+            });
+
+            sectionSelect.disabled = sections.length === 0;
+
+            if (selectedSection && sections.includes(selectedSection)) {
+                sectionSelect.value = selectedSection;
+            } else {
+                sectionSelect.value = '';
+            }
+        }
+
+        function populateFilterSectionOptions(selectedSection) {
+            const filterYear = document.getElementById('filter_year');
+            const filterSection = document.getElementById('filter_section');
+            if (!filterYear || !filterSection) return;
+
+            const year = String(filterYear.value || '');
+            const sections = (year && year !== 'All Years')
+                ? (SECTIONS_BY_YEAR[year] || [])
+                : ALL_SECTIONS;
+
+            filterSection.innerHTML = '';
+
+            const allOption = document.createElement('option');
+            allOption.value = 'All Sections';
+            allOption.textContent = 'All Sections';
+            filterSection.appendChild(allOption);
+
+            sections.forEach(function (section) {
+                const option = document.createElement('option');
+                option.value = section;
+                option.textContent = section;
+                filterSection.appendChild(option);
+            });
+
+            if (selectedSection && selectedSection !== 'All Sections' && sections.includes(selectedSection)) {
+                filterSection.value = selectedSection;
+            } else {
+                filterSection.value = 'All Sections';
+            }
+        }
+
+        const addYearLevel = document.getElementById('add_year_level');
+        const addSection = document.getElementById('add_section');
+        const editYearLevel = document.getElementById('edit_year_level');
+        const editSection = document.getElementById('edit_section');
+        const filterYear = document.getElementById('filter_year');
+
+        addYearLevel?.addEventListener('change', function () {
+            populateSectionOptions(addYearLevel, addSection);
+        });
+
+        editYearLevel?.addEventListener('change', function () {
+            populateSectionOptions(editYearLevel, editSection);
+        });
+
+        filterYear?.addEventListener('change', function () {
+            populateFilterSectionOptions();
+        });
+
+        populateFilterSectionOptions(@json(request('section', 'All Sections')));
+
         function editStudent(student) {
             document.getElementById('editForm').action = '/registrar/students/' + student.id;
             document.getElementById('edit_student_number').value = student.student_number || '';
@@ -703,7 +811,7 @@
             document.getElementById('edit_last_name').value = student.last_name || '';
             document.getElementById('edit_course').value = student.course || 'BSIT';
             document.getElementById('edit_year_level').value = student.year_level || '';
-            document.getElementById('edit_section').value = student.section || '';
+            populateSectionOptions(editYearLevel, editSection, student.section || '');
             document.getElementById('edit_phone_number').value = student.phone_number || '';
             document.getElementById('edit_rfid_tag').value = student.rfid_tag || '';
             document.getElementById('edit_status').value = student.status || 'Enrolled';
@@ -713,7 +821,10 @@
         // Validation for Add Form
         function validateAddForm() {
             let valid = true;
-            const studentNum = document.getElementById('add_student_number').value.toUpperCase();
+            const studentNumberInput = document.getElementById('add_student_number');
+            // CSS text-uppercase only changes appearance — normalize the real value before submit.
+            const studentNum = studentNumberInput.value.trim().toUpperCase();
+            studentNumberInput.value = studentNum;
             const firstName = document.getElementById('add_first_name').value;
             const lastName = document.getElementById('add_last_name').value;
 
@@ -759,7 +870,10 @@
         // Validation for Edit Form
         function validateEditForm() {
             let valid = true;
-            const studentNum = document.getElementById('edit_student_number').value.toUpperCase();
+            const studentNumberInput = document.getElementById('edit_student_number');
+            // CSS text-uppercase only changes appearance — normalize the real value before submit.
+            const studentNum = studentNumberInput.value.trim().toUpperCase();
+            studentNumberInput.value = studentNum;
             const firstName = document.getElementById('edit_first_name').value;
             const lastName = document.getElementById('edit_last_name').value;
 

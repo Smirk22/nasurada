@@ -8,9 +8,27 @@ use App\Models\Student;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class RegistrarController extends Controller
 {
+    /**
+     * Number of student records shown per page.
+     */
+    private const STUDENTS_PER_PAGE = 25;
+
+    /**
+     * Allowed sections for each year level.
+     *
+     * @var array<int, array<int, string>>
+     */
+    private const SECTIONS_BY_YEAR = [
+        1 => ['S1A1', 'S1B1', 'S1C1'],
+        2 => ['S3B1', 'S3C1'],
+        3 => ['S5B2', 'S5C2'],
+        4 => ['S7C3', 'S7C4'],
+    ];
+
     public function dashboard()
     {
         $totalStudents = Student::count();
@@ -43,7 +61,12 @@ class RegistrarController extends Controller
             $query->where('section', $request->input('section'));
         }
 
-        $students = $query->get();
+        $students = $query
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->orderBy('id')
+            ->paginate(self::STUDENTS_PER_PAGE)
+            ->withQueryString();
 
         $assignedRfidOwners = Student::query()
             ->whereNotNull('rfid_tag')
@@ -56,11 +79,19 @@ class RegistrarController extends Controller
             })
             ->all();
 
-        return view('registrar.students', compact('students', 'assignedRfidOwners'));
+        $latestStudentNumber = Student::query()
+            ->latest('id')
+            ->value('student_number');
+
+        return view('registrar.students', compact('students', 'assignedRfidOwners', 'latestStudentNumber'));
     }
 
     public function store(Request $request)
     {
+        $request->merge([
+            'student_number' => strtoupper(trim((string) $request->input('student_number'))),
+        ]);
+
         $validated = $request->validate([
             // Student Number - Required, Unique, Format: 3 letters + 8 numbers (e.g., MAR87654320)
             'student_number' => 'required|unique:students,student_number|regex:/^[A-Z]{3}\d{8}$/',
@@ -77,8 +108,8 @@ class RegistrarController extends Controller
             // Year Level - Only 1, 2, 3, or 4
             'year_level' => 'required|integer|in:1,2,3,4',
 
-            // Section - Only predefined sections
-            'section' => 'required|in:S1B1,S1B2,S4B1,S7C3',
+            // Section - Must match the selected year level
+            'section' => ['required', 'string', Rule::in($this->sectionsForYear($request->input('year_level')))],
 
             // Phone Number - Optional, Philippine mobile number (e.g., 09171234567 or +639171234567)
             'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^(?:\+?63|0)9\d{9}$/'],
@@ -92,7 +123,7 @@ class RegistrarController extends Controller
             'last_name.regex' => 'Last Name can only contain letters, spaces, hyphens, and apostrophes.',
             'course.in' => 'Only BSIT course is available for this pilot program.',
             'year_level.in' => 'Year Level must be between 1st and 4th year.',
-            'section.in' => 'Selected section is not valid. Only predefined sections are allowed.',
+            'section.in' => 'Selected section is not valid for the chosen year level.',
             'phone_number.regex' => 'Phone Number must be a valid PH mobile number (e.g., 09171234567 or +639171234567).',
             'rfid_tag.unique' => 'This RFID tag is already assigned to another student.',
         ]);
@@ -113,13 +144,17 @@ class RegistrarController extends Controller
 
     public function update(Request $request, Student $student)
     {
+        $request->merge([
+            'student_number' => strtoupper(trim((string) $request->input('student_number'))),
+        ]);
+
         $validated = $request->validate([
             'student_number' => 'required|unique:students,student_number,'.$student->id.'|regex:/^[A-Z]{3}\d{8}$/',
             'first_name' => 'required|string|max:255|regex:/^[a-zA-Z\s\'-]+$/',
             'last_name' => 'required|string|max:255|regex:/^[a-zA-Z\s\'-]+$/',
             'course' => 'required|in:BSIT',
             'year_level' => 'required|integer|in:1,2,3,4',
-            'section' => 'required|in:S1B1,S1B2,S4B1,S7C3',
+            'section' => ['required', 'string', Rule::in($this->sectionsForYear($request->input('year_level')))],
             'phone_number' => ['nullable', 'string', 'max:20', 'regex:/^(?:\+?63|0)9\d{9}$/'],
             'rfid_tag' => 'nullable|string|unique:students,rfid_tag,'.$student->id,
             'status' => 'required|string',
@@ -130,7 +165,7 @@ class RegistrarController extends Controller
             'last_name.regex' => 'Last Name can only contain letters, spaces, hyphens, and apostrophes.',
             'course.in' => 'Only BSIT course is available for this pilot program.',
             'year_level.in' => 'Year Level must be between 1st and 4th year.',
-            'section.in' => 'Selected section is not valid. Only predefined sections are allowed.',
+            'section.in' => 'Selected section is not valid for the chosen year level.',
             'phone_number.regex' => 'Phone Number must be a valid PH mobile number (e.g., 09171234567 or +639171234567).',
             'rfid_tag.unique' => 'This RFID tag is already assigned to another student.',
         ]);
@@ -219,5 +254,15 @@ class RegistrarController extends Controller
         );
 
         return redirect()->back()->with('success', 'End of Semester process completed. All students un-enrolled and RFID tags unassigned.');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function sectionsForYear(mixed $yearLevel): array
+    {
+        $year = (int) $yearLevel;
+
+        return self::SECTIONS_BY_YEAR[$year] ?? [];
     }
 }
