@@ -1,29 +1,53 @@
 Option Explicit
 
-Dim fso, shell, baseDir, url, port, healthUrl, lanIp
+' IETI SEVS launcher
+' - Opens the app on this PC via http://localhost (no "Not secure" warning)
+' - Starts the Laravel server only if it is not already running
+' - Never starts a second server when port 8000 is already in use
+' - Shows the LAN address for phones/tablets on the same network
+
+Const PORT = 8000
+Const LOGIN_PATH = "/login"
+
+Dim fso, shell, baseDir, localUrl, healthUrl
+Dim startedServer
 
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set shell = CreateObject("WScript.Shell")
 
 baseDir = fso.GetParentFolderName(WScript.ScriptFullName)
-port = 8000
-lanIp = GetLanIp()
-
-If lanIp <> "" Then
-    url = "http://" & lanIp & ":" & port & "/login"
-Else
-    url = "http://localhost:" & port & "/login"
-End If
-healthUrl = "http://127.0.0.1:" & port & "/login"
+localUrl = "http://localhost:" & PORT & LOGIN_PATH
+healthUrl = "http://127.0.0.1:" & PORT & "/up"
 
 EnsureAssets
-If Not IsServerUp() Then
+
+startedServer = False
+
+If IsPortListening() Then
+    ' A server is already running or still booting. Wait for it to answer
+    ' instead of launching a duplicate process on the same port.
+    If Not IsServerUp() Then WaitForServer 60
+Else
     StartServer
-    WaitForServer 120
+    startedServer = True
+    WaitForServer 60
 End If
 
-shell.Run url, 1, False
-ShowAddress
+If Not IsServerUp() Then
+    MsgBox "IETI SEVS could not be started." & vbCrLf & vbCrLf & _
+        "Make sure PHP is installed and available in PATH, then try again." & vbCrLf & _
+        "You can also run start-sevs.bat from a Command Prompt to see the error.", _
+        16, "IETI SEVS"
+    WScript.Quit 1
+End If
+
+' localhost is treated as a secure origin by Edge/Chrome, so no
+' "Not secure" warning appears in the address bar on this PC.
+shell.Run localUrl, 1, False
+
+If startedServer Then ShowAddress
+
+' ---------------------------------------------------------------------------
 
 Sub EnsureAssets()
     If Not fso.FolderExists(baseDir & "\node_modules") Then
@@ -37,22 +61,75 @@ End Sub
 
 Sub StartServer()
     Dim serverCmd
-    serverCmd = "cmd /c cd /d """ & baseDir & """ && php artisan serve --host=0.0.0.0 --port=" & port
+    serverCmd = "cmd /c cd /d """ & baseDir & """ && php artisan serve --host=0.0.0.0 --port=" & PORT
     shell.Run serverCmd, 0, False
 End Sub
 
 Sub ShowAddress()
-    Dim message
+    Dim message, lanIp, lanUrl
 
+    lanIp = GetLanIp()
     If lanIp = "" Then Exit Sub
 
-    message = "IETI SEVS is running." & vbCrLf & vbCrLf & _
-        "Open from any device on this network:" & vbCrLf & _
-        url & vbCrLf & vbCrLf & _
-        "If another device cannot connect, run allow-lan-access.bat " & _
-        "as administrator to open TCP port " & port & " in Windows Firewall."
+    lanUrl = "http://" & lanIp & ":" & PORT & LOGIN_PATH
 
-    shell.Popup message, 10, "IETI SEVS", 64
+    message = "IETI SEVS is running." & vbCrLf & vbCrLf & _
+        "On this PC:" & vbCrLf & _
+        "http://localhost:" & PORT & vbCrLf & vbCrLf & _
+        "From other devices on this network:" & vbCrLf & _
+        lanUrl & vbCrLf & vbCrLf & _
+        "If another device cannot connect, run allow-lan-access.bat " & _
+        "as administrator to open TCP port " & PORT & " in Windows Firewall."
+
+    shell.Popup message, 5, "IETI SEVS", 64
+End Sub
+
+Function IsServerUp()
+    Dim http
+
+    IsServerUp = False
+    On Error Resume Next
+
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.SetTimeouts 1000, 1000, 1000, 2000
+    http.Open "GET", healthUrl, False
+    http.Send
+
+    If Err.Number = 0 Then
+        If http.Status = 200 Or http.Status = 302 Then
+            IsServerUp = True
+        End If
+    End If
+
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Function IsPortListening()
+    Dim exec, output
+
+    IsPortListening = False
+    On Error Resume Next
+
+    Set exec = shell.Exec("cmd /c netstat -ano -p tcp | findstr LISTENING | findstr /C:"":" & PORT & " """)
+    Do While exec.Status = 0
+        WScript.Sleep 50
+    Loop
+    output = exec.StdOut.ReadAll
+
+    If InStr(output, ":" & PORT) > 0 Then IsPortListening = True
+
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Sub WaitForServer(seconds)
+    Dim i
+
+    For i = 1 To seconds * 4
+        If IsServerUp() Then Exit Sub
+        WScript.Sleep 250
+    Next
 End Sub
 
 Function GetLanIp()
@@ -92,33 +169,3 @@ Function IsLanIpv4(value)
 
     IsLanIpv4 = True
 End Function
-
-Function IsServerUp()
-    Dim http
-
-    IsServerUp = False
-    On Error Resume Next
-
-    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
-    http.SetTimeouts 500, 500, 500, 500
-    http.Open "GET", healthUrl, False
-    http.Send
-
-    If Err.Number = 0 Then
-        If http.Status = 200 Or http.Status = 302 Then
-            IsServerUp = True
-        End If
-    End If
-
-    Err.Clear
-    On Error GoTo 0
-End Function
-
-Sub WaitForServer(seconds)
-    Dim i
-
-    For i = 1 To seconds * 2
-        If IsServerUp() Then Exit Sub
-        WScript.Sleep 500
-    Next
-End Sub
