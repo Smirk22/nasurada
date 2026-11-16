@@ -9,6 +9,11 @@ use Illuminate\Http\Request;
 class EntryLogController extends Controller
 {
     /**
+     * Number of entry logs shown per page inside the section modal.
+     */
+    private const LOGS_PER_PAGE = 15;
+
+    /**
      * Display Entry Logs page
      */
     public function index()
@@ -68,7 +73,7 @@ class EntryLogController extends Controller
             $query->whereDate('date', $request->input('date'));
         }
 
-        return response()->json($query->get());
+        return response()->json($query->paginate(self::LOGS_PER_PAGE));
     }
 
     /**

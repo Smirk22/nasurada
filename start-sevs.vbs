@@ -169,3 +169,35 @@ Function IsLanIpv4(value)
 
     IsLanIpv4 = True
 End Function
+
+Function IsServerUp()
+    Dim http
+
+    IsServerUp = False
+    On Error Resume Next
+
+    Set http = CreateObject("WinHttp.WinHttpRequest.5.1")
+    http.SetTimeouts 500, 500, 500, 500
+    http.Open "GET", healthUrl, False
+    http.Send
+
+    ' Any HTTP response means a server is already listening on the port.
+    ' Do not start a second one just because the app returned an error page.
+    If Err.Number = 0 Then
+        If http.Status > 0 Then
+            IsServerUp = True
+        End If
+    End If
+
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Sub WaitForServer(seconds)
+    Dim i
+
+    For i = 1 To seconds * 2
+        If IsServerUp() Then Exit Sub
+        WScript.Sleep 500
+    Next
+End Sub

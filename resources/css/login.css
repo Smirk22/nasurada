@@ -320,13 +320,38 @@ body {
     font-size: 0.85rem;
 }
 
-.auth-2fa-hint {
-    display: inline-flex;
+.auth-captcha {
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--off-white);
+}
+
+.auth-captcha__label {
+    display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
+    margin-bottom: 8px;
     color: var(--green-700);
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.auth-captcha .form-label {
+    display: block;
+}
+
+.auth-captcha .form-control {
+    border-radius: 10px;
+    background: #fff;
+}
+
+.auth-captcha .form-control:focus {
+    border-color: var(--green-700);
+    background: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(20, 83, 45, 0.15);
 }
 
 .auth-button {
@@ -357,6 +382,84 @@ body {
 
 .auth-button:active {
     transform: scale(0.99);
+}
+
+.auth-lockout-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.auth-lockout-modal[hidden] {
+    display: none !important;
+}
+
+.auth-lockout-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 61, 36, 0.55);
+}
+
+.auth-lockout-modal__dialog {
+    position: relative;
+    z-index: 1;
+    width: min(100%, 420px);
+    padding: 28px 24px 22px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 48px -20px rgba(0, 0, 0, 0.45);
+    text-align: center;
+}
+
+.auth-lockout-modal__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 14px;
+    border-radius: 50%;
+    background: #fdecea;
+    color: var(--error);
+    font-size: 1.5rem;
+}
+
+.auth-lockout-modal__title {
+    margin: 0 0 8px;
+    color: var(--green-900);
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.auth-lockout-modal__account {
+    margin: 0 0 8px;
+    color: var(--green-900);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.auth-lockout-modal__message {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.auth-lockout-modal__timer {
+    margin: 0 0 16px;
+    color: var(--green-700);
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+}
+
+.auth-lockout-modal__btn {
+    min-width: 120px;
 }
 
 .auth-button:focus-visible {
@@ -730,8 +833,9 @@ body {
 }
 
 .auth-page--login .auth-panel__body {
-    align-items: center;
-    overflow: hidden;
+    align-items: safe center;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: clamp(10px, 2vh, 28px) clamp(16px, 3vw, 32px);
 }
 
@@ -781,6 +885,14 @@ body {
 
     .auth-page--login .auth-button {
         height: 44px;
+    }
+
+    .auth-captcha {
+        padding: 8px 12px;
+    }
+
+    .auth-captcha__label {
+        margin-bottom: 4px;
     }
 }
 

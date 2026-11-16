@@ -31,7 +31,7 @@
                         <h1 class="auth-form-wrap__heading">Verify it's you</h1>
                         <p class="auth-form-wrap__lead">
                             Open your authenticator app and enter the 6-digit code for
-                            <strong>{{ $username }}</strong>.
+                            <strong>{{ $email }}</strong>.
                         </p>
                     </div>
 

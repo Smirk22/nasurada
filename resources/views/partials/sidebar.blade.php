@@ -8,11 +8,17 @@
     <!-- Navigation Menu -->
     <nav class="flex-1 px-4 py-6 space-y-2">
         @if(auth()->user()->role === 'Admin')
-            <a href="/adashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('adashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+            <a href="{{ route('adashboard') }}" data-admin-tab="overview" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 21h6a2 2 0 002-2V9l-7-4-7 4v12a2 2 0 002 2z"></path>
                 </svg>
                 <span class="text-sm font-medium">Admin Dashboard</span>
+            </a>
+            <a href="{{ route('adashboard') }}#backups" data-admin-tab="backups" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                </svg>
+                <span class="text-sm font-medium">Database Backups</span>
             </a>
             <a href="/rdashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('rdashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,15 +45,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                 </svg>
                 <span class="text-sm font-medium">Guard Dashboard</span>
-            </a>
-        @endif
-
-        @if(!(auth()->user()->role === 'Admin'))
-            <a href="{{ route('two-factor.setup') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('settings/two-factor') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751A11.959 11.959 0 0112 2.714z"></path>
-                </svg>
-                <span class="text-sm font-medium">Two-Factor Auth</span>
             </a>
         @endif
 
