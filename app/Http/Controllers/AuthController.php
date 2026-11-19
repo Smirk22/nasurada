@@ -343,6 +343,11 @@ class AuthController extends Controller
 
         $role = strtolower(trim($user->role));
 
+        // 0. Super Admin redirect
+        if ($role === 'superadmin') {
+            return redirect()->intended('/superadmin');
+        }
+
         // 1. Admin redirect
         if ($role === 'admin') {
             return redirect()->intended('/adashboard');

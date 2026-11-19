@@ -8,6 +8,7 @@ use App\Http\Controllers\ForcedPasswordChangeController;
 use App\Http\Controllers\GuardController;
 use App\Http\Controllers\RegistrarController;
 use App\Http\Controllers\RfidController;
+use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\TwoFactorSetupController;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,21 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::delete('/admin/backups/{file}', [BackupController::class, 'destroy'])
         ->where('file', '[A-Za-z0-9._-]+')
         ->name('admin.backups.destroy');
+
+    // Reports / exports
+    Route::get('/admin/reports/entry-logs/export', [AdminController::class, 'exportEntryLogs'])->name('admin.reports.entry-logs.export');
+});
+
+// Super Admin Routes (highest privilege — full system control)
+Route::middleware(['auth', 'role:SuperAdmin'])->prefix('superadmin')->name('superadmin.')->group(function () {
+    Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
+
+    Route::post('/users', [SuperAdminController::class, 'storeUser'])->name('users.store');
+    Route::put('/users/{user}', [SuperAdminController::class, 'updateUser'])->name('users.update');
+    Route::post('/users/{user}/temporary-password', [SuperAdminController::class, 'generateTemporaryPassword'])->name('users.temporary-password');
+    Route::delete('/users/{user}', [SuperAdminController::class, 'destroyUser'])->name('users.destroy');
+
+    Route::put('/settings', [SuperAdminController::class, 'updateSettings'])->name('settings.update');
 });
 
 // Registrar Routes (registrar and admin)

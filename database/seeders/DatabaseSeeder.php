@@ -28,14 +28,19 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($students as $student) {
-            Student::create($student);
+            // The RFID gate rejects students whose enrollment is not confirmed
+            // for the current school year, so seed those fields explicitly.
+            Student::create($student + [
+                'school_year' => Student::currentSchoolYear(),
+                'enrollment_confirmed' => true,
+            ]);
         }
 
-        {
-         // This runs automatically when seeding
-         $this->call([
-         AccountSeeder::class,
+        // This runs automatically when seeding
+        $this->call([
+            AccountSeeder::class,
+            SuperAdminSeeder::class,
         ]);
-}
+
     }
 }

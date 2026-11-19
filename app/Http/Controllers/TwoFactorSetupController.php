@@ -128,6 +128,7 @@ class TwoFactorSetupController extends Controller
     private function dashboardUrl(User $user): string
     {
         return match (strtolower(trim($user->role))) {
+            'superadmin' => '/superadmin',
             'admin' => '/adashboard',
             'security' => '/Security/dashboard',
             default => '/rdashboard',

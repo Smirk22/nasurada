@@ -81,19 +81,124 @@
                     </div>
                 </div>
 
-                <!-- Quick Actions -->
+                <!-- Enrollment Status & Today's Entry Summary -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
+                        <h2 class="text-lg font-bold text-gray-800">Enrollment Status Overview</h2>
+                        <p class="text-xs text-gray-500 mt-1">Student records grouped by current status.</p>
+                        <div class="mt-4 space-y-2">
+                            @forelse($enrollmentStatus as $status => $count)
+                                <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                                    <span class="text-sm font-medium text-gray-700">{{ $status ?: 'Unspecified' }}</span>
+                                    <span class="text-sm font-bold {{ $status === 'Enrolled' ? 'text-green-700' : 'text-gray-700' }}">{{ $count }}</span>
+                                </div>
+                            @empty
+                                <p class="text-sm text-gray-400">No student records yet.</p>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
+                        <h2 class="text-lg font-bold text-gray-800">Today's Entry Summary</h2>
+                        <p class="text-xs text-gray-500 mt-1">Granted entries today by year and section.</p>
+                        <div class="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
+                            @forelse($entrySummaryToday as $group => $count)
+                                <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                                    <span class="text-sm font-medium text-gray-700">{{ $group }}</span>
+                                    <span class="text-sm font-bold text-green-700">{{ $count }}</span>
+                                </div>
+                            @empty
+                                <p class="text-sm text-gray-400">No granted entries recorded today.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Year / Section Breakdown -->
                 <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
-                    <h2 class="text-lg font-bold text-gray-800 mb-4">Quick Actions</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <a href="/registrar/students" class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-6 py-3 rounded-lg transition text-center">
-                            + Add New Student
-                        </a>
-                        <a href="/registrar/entry-logs" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition text-center">
-                            View Entry Logs
-                        </a>
-                        <a href="/registrar/students" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold px-6 py-3 rounded-lg transition text-center">
-                            Manage Students
-                        </a>
+                    <h2 class="text-lg font-bold text-gray-800">Students by Year & Section</h2>
+                    <p class="text-xs text-gray-500 mt-1">Current student counts per year level and section.</p>
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @forelse($sectionBreakdown as $year => $rows)
+                            <div class="rounded-lg border border-gray-100">
+                                <div class="bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">Year {{ $year }}</div>
+                                <div class="divide-y divide-gray-100">
+                                    @foreach($rows as $row)
+                                        <div class="flex items-center justify-between px-3 py-2 text-sm">
+                                            <span class="text-gray-600">{{ $row->section }}</span>
+                                            <span class="font-semibold text-gray-800">{{ $row->total }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-400">No sections assigned yet.</p>
+                        @endforelse
+                    </div>
+                </div>
+
+                <!-- Missing RFID / Photo -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-lg font-bold text-gray-800">Students Missing RFID</h2>
+                            <span class="text-xs font-semibold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">{{ $unassignedRfids }}</span>
+                        </div>
+                        <div class="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
+                            @forelse($missingRfidStudents as $student)
+                                <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-700">{{ $student->last_name }}, {{ $student->first_name }}</p>
+                                        <p class="text-xs text-gray-400">{{ $student->student_number }} · Year {{ $student->year_level }} {{ $student->section }}</p>
+                                    </div>
+                                    <a href="/registrar/students?search={{ urlencode($student->student_number) }}" class="text-xs font-semibold text-ieti-green hover:underline">Assign</a>
+                                </div>
+                            @empty
+                                <p class="text-sm text-gray-400">All students have an RFID tag assigned.</p>
+                            @endforelse
+                        </div>
+                        @if($unassignedRfids > $missingRfidStudents->count())
+                            <a href="/registrar/students" class="mt-3 inline-block text-xs font-semibold text-ieti-green hover:underline">View all {{ $unassignedRfids }} students</a>
+                        @endif
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
+                        <h2 class="text-lg font-bold text-gray-800">Students Missing Photo</h2>
+                        <div class="mt-4 space-y-2 max-h-64 overflow-y-auto pr-1">
+                            @forelse($missingPhotoStudents as $student)
+                                <div class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-700">{{ $student->last_name }}, {{ $student->first_name }}</p>
+                                        <p class="text-xs text-gray-400">{{ $student->student_number }} · Year {{ $student->year_level }} {{ $student->section }}</p>
+                                    </div>
+                                    <a href="/registrar/students?search={{ urlencode($student->student_number) }}" class="text-xs font-semibold text-ieti-green hover:underline">Upload</a>
+                                </div>
+                            @empty
+                                <p class="text-sm text-gray-400">All students have a photo on file.</p>
+                            @endforelse
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Student Activity -->
+                <div class="bg-white rounded-xl shadow border border-gray-100 p-6">
+                    <h2 class="text-lg font-bold text-gray-800">Recent Student Activity</h2>
+                    <p class="text-xs text-gray-500 mt-1">Latest student record changes recorded by staff.</p>
+                    <div class="mt-4 divide-y divide-gray-100 max-h-72 overflow-y-auto pr-1">
+                        @forelse($recentActivities as $activity)
+                            <div class="py-3 flex items-start justify-between gap-3 text-sm">
+                                <div>
+                                    <p class="font-medium text-gray-800">{{ $activity->action }}</p>
+                                    <p class="text-xs text-gray-500">{{ $activity->details }}</p>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <p class="text-xs text-gray-500">{{ $activity->user_name }}</p>
+                                    <p class="text-xs text-gray-400">{{ $activity->created_at?->diffForHumans() }}</p>
+                                </div>
+                            </div>
+                        @empty
+                            <p class="text-sm text-gray-400 py-4">No student activity recorded yet.</p>
+                        @endforelse
                     </div>
                 </div>
 

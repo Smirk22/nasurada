@@ -37,7 +37,70 @@ class RegistrarController extends Controller
             ->where('status', 'granted')
             ->count();
 
-        return view('rdashboard', compact('totalStudents', 'unassignedRfids', 'entriesToday'));
+        // Year > Section breakdown
+        $sectionBreakdown = Student::query()
+            ->selectRaw('year_level, section, COUNT(*) as total')
+            ->whereNotNull('section')
+            ->where('section', '<>', '')
+            ->groupBy('year_level', 'section')
+            ->orderBy('year_level')
+            ->orderBy('section')
+            ->get()
+            ->groupBy('year_level');
+
+        // Students missing RFID / photo (preview lists)
+        $missingRfidStudents = Student::query()
+            ->where(fn ($q) => $q->whereNull('rfid_tag')->orWhere('rfid_tag', ''))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->take(10)
+            ->get(['id', 'first_name', 'last_name', 'student_number', 'year_level', 'section']);
+
+        $missingPhotoStudents = Student::query()
+            ->where(fn ($q) => $q->whereNull('photo')->orWhere('photo', ''))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->take(10)
+            ->get(['id', 'first_name', 'last_name', 'student_number', 'year_level', 'section']);
+
+        // Today's granted entries grouped by section
+        $entrySummaryToday = EntryLog::query()
+            ->whereDate('date', today())
+            ->where('status', 'granted')
+            ->with('student:id,year_level,section')
+            ->get()
+            ->filter(fn ($log) => $log->student !== null)
+            ->groupBy(fn ($log) => $log->student->year_level.' — '.$log->student->section)
+            ->map->count()
+            ->sortKeys();
+
+        // Enrollment status overview
+        $enrollmentStatus = Student::query()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        // Recent student-related activity
+        $recentActivities = ActivityLog::query()
+            ->where(function ($q) {
+                $q->where('action', 'like', '%Student%')
+                    ->orWhere('action', 'End of Semester Triggered');
+            })
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return view('rdashboard', compact(
+            'totalStudents',
+            'unassignedRfids',
+            'entriesToday',
+            'sectionBreakdown',
+            'missingRfidStudents',
+            'missingPhotoStudents',
+            'entrySummaryToday',
+            'enrollmentStatus',
+            'recentActivities'
+        ));
     }
 
     public function students(Request $request)

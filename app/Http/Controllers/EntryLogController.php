@@ -41,7 +41,7 @@ class EntryLogController extends Controller
                 $year => $sectionsByYear->get($year, collect()),
             ]);
 
-        $sectionCounts = $this->todayCounts();
+        $sectionCounts = $this->countsFor();
 
         return view('registrar.entry-logs', [
             'yearLevels' => $yearLevels,
@@ -56,6 +56,8 @@ class EntryLogController extends Controller
      */
     public function getBySection(Request $request, $section)
     {
+        $date = $this->resolveDate($request);
+
         $query = EntryLog::query()
             ->whereHas('student', function ($query) use ($request, $section) {
                 $query->where('section', $section);
@@ -70,35 +72,38 @@ class EntryLogController extends Controller
             ->orderByDesc('id');
 
         if ($request->filled('date')) {
-            $query->whereDate('date', $request->input('date'));
+            $query->whereDate('date', $date);
         }
 
         return response()->json($query->paginate(self::LOGS_PER_PAGE));
     }
 
     /**
-     * Today's verified entry counts grouped by "year|section".
-     * Polled by the Entry Logs page to stay in sync with the guard's live feed.
+     * Verified entry counts for the selected date (today by default),
+     * grouped by "year|section". Polled by the Entry Logs page.
      */
-    public function summary()
+    public function summary(Request $request)
     {
-        $counts = $this->todayCounts();
+        $date = $this->resolveDate($request);
+        $counts = $this->countsFor($date);
 
         return response()->json([
             'counts' => (object) $counts,
             'total' => array_sum($counts),
+            'date' => $date,
+            'is_today' => $date === today()->toDateString(),
         ]);
     }
 
     /**
-     * Count of students who entered today, keyed by "year|section".
+     * Count of students who entered on $date, keyed by "year|section".
      *
      * @return array<string, int>
      */
-    private function todayCounts(): array
+    private function countsFor(?string $date = null): array
     {
         return EntryLog::query()
-            ->whereDate('date', today())
+            ->whereDate('date', $date ?? today()->toDateString())
             ->where('status', 'granted')
             ->with('student:id,year_level,section')
             ->get()
@@ -106,6 +111,26 @@ class EntryLogController extends Controller
             ->groupBy(fn ($log) => $log->student->year_level.'|'.$log->student->section)
             ->map(fn ($logs) => $logs->count())
             ->all();
+    }
+
+    /**
+     * Resolve a safe Y-m-d date from the request, falling back to today.
+     */
+    private function resolveDate(Request $request): string
+    {
+        $date = $request->input('date');
+
+        if (is_string($date) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $year = (int) substr($date, 0, 4);
+            $month = (int) substr($date, 5, 2);
+            $day = (int) substr($date, 8, 2);
+
+            if (checkdate($month, $day, $year)) {
+                return $date;
+            }
+        }
+
+        return today()->toDateString();
     }
 
     /**

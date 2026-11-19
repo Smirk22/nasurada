@@ -1,9 +1,10 @@
 <?php
 
+use App\Http\Middleware\EnsureSystemAvailable;
 use App\Http\Middleware\EnsureTemporaryPasswordChanged;
-use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\PreventBackHistory;
 use App\Http\Middleware\RoleMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             PreventBackHistory::class,
+            EnsureSystemAvailable::class,
             EnsureTemporaryPasswordChanged::class,
         ]);
 
@@ -43,10 +45,11 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return match ($user?->role) {
-                'Admin'     => route('adashboard'),
+                'SuperAdmin' => route('superadmin.dashboard'),
+                'Admin' => route('adashboard'),
                 'Registrar' => route('rdashboard'),
-                'Security'  => route('guard.dashboard'),
-                default     => '/login',
+                'Security' => route('guard.dashboard'),
+                default => '/login',
             };
         });
     })

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -47,11 +47,23 @@
                 <!-- Overview tab -->
                 <div id="admin-tab-overview" class="flex flex-col gap-4">
                 <!-- Summary Cards -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
                     <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
-                        <span class="text-xs font-semibold text-gray-500 uppercase">System Staff Users</span>
-                        <div class="text-3xl font-extrabold text-ieti-green mt-1">{{ $totalUsers }}</div>
-                        <span class="text-xs text-green-600 mt-1 font-medium">Admins, Registrars & Security</span>
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Admins</span>
+                        <div class="text-3xl font-extrabold text-ieti-green mt-1">{{ $adminCount }}</div>
+                        <span class="text-xs text-gray-500 mt-1 font-medium">Staff accounts</span>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Registrars</span>
+                        <div class="text-3xl font-extrabold text-emerald-700 mt-1">{{ $registrarCount }}</div>
+                        <span class="text-xs text-gray-500 mt-1 font-medium">Staff accounts</span>
+                    </div>
+
+                    <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Guards</span>
+                        <div class="text-3xl font-extrabold text-teal-700 mt-1">{{ $guardCount }}</div>
+                        <span class="text-xs text-gray-500 mt-1 font-medium">Security accounts</span>
                     </div>
 
                     <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col justify-between">
@@ -64,6 +76,20 @@
                         <span class="text-xs font-semibold text-gray-500 uppercase">Invalid RFID Scans</span>
                         <div class="text-3xl font-extrabold text-red-600 mt-1">{{ $invalidRfidScans }}</div>
                         <span class="text-xs text-red-600 mt-1 font-medium">Security Alerts Logged Today</span>
+                    </div>
+                </div>
+
+                <!-- Analytics -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
+                    <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col">
+                        <h2 class="text-lg font-bold text-gray-800">Entries (Last 7 Days)</h2>
+                        <p class="text-xs text-gray-500">Granted entries per day.</p>
+                        <div class="relative h-64 mt-2"><canvas id="entries7dChart"></canvas></div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 shadow border border-gray-100 flex flex-col">
+                        <h2 class="text-lg font-bold text-gray-800">Today's Scan Status</h2>
+                        <p class="text-xs text-gray-500">Breakdown of scans recorded today.</p>
+                        <div class="relative h-64 mt-2"><canvas id="todayStatusChart"></canvas></div>
                     </div>
                 </div>
 
@@ -87,98 +113,6 @@
                         <div class="relative h-64 mt-2">
                             <canvas id="rfidScanChart"></canvas>
                         </div>
-                    </div>
-                </div>
-
-                <!-- System User Management -->
-                <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-3">
-                    <div class="flex justify-between items-center shrink-0">
-                        <div>
-                            <h2 class="text-lg font-bold text-gray-800">User Account Management</h2>
-                            <p class="text-xs text-gray-500">Manage staff access roles (Admin, Registrar, Security Guard).</p>
-                        </div>
-                        <button onclick="openModal('addUserModal')" class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
-                            + Create Staff User
-                        </button>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50">
-                                <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
-                                    <th class="p-3">Name</th>
-                                    <th class="p-3">Username</th>
-                                    <th class="p-3">Email</th>
-                                    <th class="p-3">Assigned Role</th>
-                                    <th class="p-3">Temp Password</th>
-                                    <th class="p-3 text-center">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100 text-sm">
-                                @foreach($users as $user)
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="p-3 font-semibold text-gray-800">{{ $user->name }}</td>
-                                        <td class="p-3 text-gray-600">{{ $user->username }}</td>
-                                        <td class="p-3 text-gray-600">{{ $user->email }}</td>
-                                        <td class="p-3">
-                                            <div class="flex flex-wrap items-center gap-1.5">
-                                                <span class="px-2 py-1 text-xs font-semibold rounded-full
-                                                    {{ $user->role === 'Admin' ? 'bg-purple-100 text-purple-800' : ($user->role === 'Registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">
-                                                    {{ $user->role ?? 'Registrar' }}
-                                                </span>
-                                                @if ($user->must_reset_password)
-                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800" title="Admin must generate a temporary password to unlock this account">
-                                                        Locked — reset password
-                                                    </span>
-                                                @elseif ($user->locked_until && $user->locked_until->isFuture())
-                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                                                        Locked until {{ $user->locked_until->format('g:i A') }}
-                                                    </span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="p-3">
-                                            <div class="flex flex-wrap items-center gap-1.5">
-                                                <button
-                                                    type="button"
-                                                    title="Generate temporary password"
-                                                    aria-label="Generate temporary password"
-                                                    onclick="openGenerateTempPasswordModal({{ $user->id }}, {{ json_encode($user->email) }}, {{ json_encode($user->username) }})"
-                                                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-ieti-green hover:bg-green-800 text-white shadow-sm transition"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true">
-                                                        <path fill-rule="evenodd" d="M15.75 1.5a6.75 6.75 0 0 0-6.651 7.906c.067.39-.032.717-.221.906l-6.5 6.499a3 3 0 0 0-.849 2.121v2.818h2.818a3 3 0 0 0 2.121-.85l6.499-6.5c.19-.189.517-.288.906-.22A6.75 6.75 0 1 0 15.75 1.5Zm0 3a.75.75 0 0 0 0 1.5A2.25 2.25 0 0 1 18 8.25a.75.75 0 0 0 1.5 0 3.75 3.75 0 0 0-3.75-3.75Z" clip-rule="evenodd" />
-                                                    </svg>
-                                                </button>
-                                                @if ($user->temporary_password)
-                                                    <code
-                                                        data-temp-password="{{ $user->temporary_password }}"
-                                                        class="temp-password-value px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs font-mono text-amber-900 select-all"
-                                                    >{{ $user->temporary_password }}</code>
-                                                    <button
-                                                        type="button"
-                                                        onclick="copyTableTempPassword(this)"
-                                                        class="px-2 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded"
-                                                    >
-                                                        Copy
-                                                    </button>
-                                                @else
-                                                    <span class="text-xs text-gray-400">No temp password yet</span>
-                                                @endif
-                                            </div>
-                                        </td>
-                                        <td class="p-3 text-center space-x-2">
-                                            <button onclick="editUser({{ json_encode($user) }})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Edit Role</button>
-                                            <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this user?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">Delete</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
                     </div>
                 </div>
 
@@ -348,6 +282,96 @@
                 </div>
                 </div>
 
+                <div id="admin-tab-reports" class="hidden flex flex-col gap-4">
+                <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-4">
+                    <div class="flex flex-wrap justify-between items-start gap-3">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">Reports & Exports</h2>
+                            <p class="text-xs text-gray-500 mt-1">Download entry logs as an Excel (.xls) file (optional date range).</p>
+                        </div>
+                    </div>
+                    <form method="GET" action="{{ route('admin.reports.entry-logs.export') }}" class="flex flex-wrap items-end gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">From</label>
+                            <input type="date" name="from" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">To</label>
+                            <input type="date" name="to" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Entry Logs (Excel)</button>
+                    </form>
+                </div>
+                </div>
+
+                <div id="admin-tab-users" class="hidden flex flex-col gap-4">
+                <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-3">
+                    <div class="flex justify-between items-center shrink-0">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-800">User Account Management</h2>
+                            <p class="text-xs text-gray-500">Manage staff access roles (Admin, Registrar, Security Guard).</p>
+                        </div>
+                        <button onclick="openModal('addUserModal')" class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
+                            + Create Staff User
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50">
+                                <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
+                                    <th class="p-3">Name</th>
+                                    <th class="p-3">Username</th>
+                                    <th class="p-3">Email</th>
+                                    <th class="p-3">Assigned Role</th>
+                                    <th class="p-3">Temp Password</th>
+                                    <th class="p-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                @foreach($users as $user)
+                                    <tr class="hover:bg-gray-50 transition">
+                                        <td class="p-3 font-semibold text-gray-800">{{ $user->name }}</td>
+                                        <td class="p-3 text-gray-600">{{ $user->username }}</td>
+                                        <td class="p-3 text-gray-600">{{ $user->email }}</td>
+                                        <td class="p-3">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $user->role === 'Admin' ? 'bg-purple-100 text-purple-800' : ($user->role === 'Registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">{{ $user->role ?? 'Registrar' }}</span>
+                                                @if ($user->must_reset_password)
+                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800" title="Admin must generate a temporary password to unlock this account">Locked — reset password</span>
+                                                @elseif ($user->locked_until && $user->locked_until->isFuture())
+                                                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">Locked until {{ $user->locked_until->format('g:i A') }}</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="p-3">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <button type="button" title="Generate temporary password" aria-label="Generate temporary password" onclick="openGenerateTempPasswordModal({{ $user->id }}, {{ json_encode($user->email) }}, {{ json_encode($user->username) }})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-ieti-green hover:bg-green-800 text-white shadow-sm transition">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path fill-rule="evenodd" d="M15.75 1.5a6.75 6.75 0 0 0-6.651 7.906c.067.39-.032.717-.221.906l-6.5 6.499a3 3 0 0 0-.849 2.121v2.818h2.818a3 3 0 0 0 2.121-.85l6.499-6.5c.19-.189.517-.288.906-.22A6.75 6.75 0 1 0 15.75 1.5Zm0 3a.75.75 0 0 0 0 1.5A2.25 2.25 0 0 1 18 8.25a.75.75 0 0 0 1.5 0 3.75 3.75 0 0 0-3.75-3.75Z" clip-rule="evenodd" /></svg>
+                                                </button>
+                                                @if ($user->temporary_password)
+                                                    <code data-temp-password="{{ $user->temporary_password }}" class="temp-password-value px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs font-mono text-amber-900 select-all">{{ $user->temporary_password }}</code>
+                                                    <button type="button" onclick="copyTableTempPassword(this)" class="px-2 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded">Copy</button>
+                                                @else
+                                                    <span class="text-xs text-gray-400">No temp password yet</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="p-3 text-center space-x-2">
+                                            <button onclick="editUser({{ json_encode($user) }})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Edit Role</button>
+                                            <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this user?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                </div>
+
             </main>
         </div>
     </div>
@@ -416,7 +440,7 @@
                 @if (!empty($backupIncludesEnv)), and .env @endif.
                 It may take a moment.
             </p>
-            <form id="backupCreateForm" action="{{ route('admin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5" onsubmit="return lockBackupSubmit(this, 'Creating…')">
+            <form id="backupCreateForm" action="{{ route('admin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5" onsubmit="return lockBackupSubmit(this, 'Creatingâ€¦')">
                 @csrf
                 <button type="button" onclick="closeModal('backupCreateModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
                 <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Create Backup</button>
@@ -450,7 +474,7 @@
                 <code id="backupRestoreName" class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"></code>.
                 A safety snapshot of the current database is saved first. You will be signed out after restore.
             </p>
-            <form id="backupRestoreForm" method="POST" class="space-y-3 mt-4" onsubmit="return lockBackupSubmit(this, 'Restoring…')">
+            <form id="backupRestoreForm" method="POST" class="space-y-3 mt-4" onsubmit="return lockBackupSubmit(this, 'Restoringâ€¦')">
                 @csrf
                 <div>
                     <label for="backupRestoreConfirmation" class="text-xs font-semibold text-gray-600">Type <span class="font-mono">RESTORE</span> to confirm</label>
@@ -507,7 +531,7 @@
             const button = form.querySelector('button[type="submit"]');
             if (button) {
                 button.disabled = true;
-                button.textContent = label || 'Please wait…';
+                button.textContent = label || 'Please waitâ€¦';
             }
             return true;
         }
@@ -635,18 +659,27 @@
         function setAdminTab(tab) {
             const overview = document.getElementById('admin-tab-overview');
             const backups = document.getElementById('admin-tab-backups');
+            const reports = document.getElementById('admin-tab-reports');
+            const users = document.getElementById('admin-tab-users');
             const title = document.getElementById('adminPageTitle');
             const subtitle = document.getElementById('adminPageSubtitle');
-            const showBackups = tab === 'backups';
 
-            if (overview) overview.classList.toggle('hidden', showBackups);
-            if (backups) backups.classList.toggle('hidden', !showBackups);
+            if (overview) overview.classList.toggle('hidden', tab !== 'overview');
+            if (backups) backups.classList.toggle('hidden', tab !== 'backups');
+            if (reports) reports.classList.toggle('hidden', tab !== 'reports');
+            if (users) users.classList.toggle('hidden', tab !== 'users');
 
-            if (title) title.textContent = showBackups ? 'Database Backups' : 'Admin Dashboard';
+            if (title) {
+                if (tab === 'backups') title.textContent = 'Database Backups';
+                else if (tab === 'reports') title.textContent = 'Reports & Exports';
+                else if (tab === 'users') title.textContent = 'User Management';
+                else title.textContent = 'Admin Dashboard';
+            }
             if (subtitle) {
-                subtitle.textContent = showBackups
-                    ? 'Create, download, restore, and manage system backup archives.'
-                    : 'System administration and staff account overview.';
+                if (tab === 'backups') subtitle.textContent = 'Create, download, restore, and manage system backup archives.';
+                else if (tab === 'reports') subtitle.textContent = 'Export system reports and logs.';
+                else if (tab === 'users') subtitle.textContent = 'Manage staff access roles (Admin, Registrar, Security Guard).';
+                else subtitle.textContent = 'System administration and staff account overview.';
             }
 
             document.querySelectorAll('.admin-tab-link').forEach(function (link) {
@@ -654,15 +687,18 @@
                 link.classList.toggle('bg-green-700', active);
             });
 
-            if (showBackups && window.location.hash !== '#backups') {
-                history.replaceState(null, '', '#backups');
-            } else if (!showBackups && (window.location.hash === '#backups' || window.location.hash === '#overview')) {
-                history.replaceState(null, '', window.location.pathname + window.location.search);
-            }
+            if (tab === 'backups') history.replaceState(null, '', '#backups');
+            else if (tab === 'reports') history.replaceState(null, '', '#reports');
+            else if (tab === 'users') history.replaceState(null, '', '#users');
+            else history.replaceState(null, '', window.location.pathname + window.location.search);
         }
 
         function syncAdminTabFromHash() {
-            setAdminTab(window.location.hash === '#backups' ? 'backups' : 'overview');
+            const h = window.location.hash;
+            if (h === '#backups') setAdminTab('backups');
+            else if (h === '#reports') setAdminTab('reports');
+            else if (h === '#users') setAdminTab('users');
+            else setAdminTab('overview');
         }
 
         document.querySelectorAll('.admin-tab-link').forEach(function (link) {
@@ -670,14 +706,13 @@
                 if (!document.getElementById('admin-tab-overview')) return;
 
                 const tab = link.getAttribute('data-admin-tab');
-                if (tab !== 'overview' && tab !== 'backups') return;
+                if (tab !== 'overview' && tab !== 'backups' && tab !== 'reports' && tab !== 'users') return;
 
                 event.preventDefault();
-                if (tab === 'backups') {
-                    history.pushState(null, '', '#backups');
-                } else {
-                    history.pushState(null, '', window.location.pathname + window.location.search);
-                }
+                if (tab === 'backups') history.pushState(null, '', '#backups');
+                else if (tab === 'reports') history.pushState(null, '', '#reports');
+                else if (tab === 'users') history.pushState(null, '', '#users');
+                else history.pushState(null, '', window.location.pathname + window.location.search);
                 setAdminTab(tab);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
@@ -729,6 +764,45 @@
                 plugins: {
                     legend: { position: 'bottom' }
                 }
+            }
+        });
+
+        new Chart(document.getElementById('entries7dChart'), {
+            type: 'line',
+            data: {
+                labels: @json($analyticsLabels),
+                datasets: [{
+                    label: 'Granted entries',
+                    data: @json($analyticsData),
+                    borderColor: '#064e29',
+                    backgroundColor: 'rgba(6, 78, 41, 0.15)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+            }
+        });
+
+        new Chart(document.getElementById('todayStatusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Granted', 'Denied', 'Unknown', 'Expired'],
+                datasets: [{
+                    data: [{{ (int) $todayStatusCounts['granted'] }}, {{ (int) $todayStatusCounts['denied'] }}, {{ (int) $todayStatusCounts['unknown'] }}, {{ (int) $todayStatusCounts['expired'] }}],
+                    backgroundColor: ['#16a34a', '#dc2626', '#f59e0b', '#6b7280'],
+                    borderColor: '#ffffff',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } }
             }
         });
     </script>

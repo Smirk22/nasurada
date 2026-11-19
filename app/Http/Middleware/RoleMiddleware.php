@@ -8,11 +8,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    public function handle(Request $request, Closure $next, ...$roles): Response
+    public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
@@ -20,12 +20,17 @@ class RoleMiddleware
             return redirect()->route('password.force-change');
         }
 
-        if (!in_array($user->role, $roles)) {
+        // A Super Admin may use every area of the system.
+        if ($user->role === 'SuperAdmin') {
+            return $next($request);
+        }
+
+        if (! in_array($user->role, $roles)) {
             return match ($user->role) {
-                'Admin'     => redirect()->route('adashboard'),
+                'Admin' => redirect()->route('adashboard'),
                 'Registrar' => redirect()->route('rdashboard'),
-                'Security'  => redirect()->route('guard.dashboard'),
-                default     => abort(403),
+                'Security' => redirect()->route('guard.dashboard'),
+                default => abort(403),
             };
         }
 

@@ -285,8 +285,11 @@
                                 name="student_number"
                                 id="add_student_number"
                                 placeholder="{{ $latestStudentNumber ? 'e.g., '.$latestStudentNumber : 'e.g., MAR87654320' }}"
+                                maxlength="11"
+                                inputmode="text"
+                                autocomplete="off"
                                 required
-                                class="form-control text-uppercase"
+                                class="form-control text-uppercase student-number-input"
                             >
                             @if ($latestStudentNumber)
                                 <div class="form-text">Most recent student number entered: <span class="font-monospace fw-semibold">{{ $latestStudentNumber }}</span></div>
@@ -298,12 +301,12 @@
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="add_first_name">First Name</label>
-                                <input type="text" name="first_name" id="add_first_name" placeholder="First Name" required class="form-control">
+                                <input type="text" name="first_name" id="add_first_name" placeholder="First Name" required class="form-control name-letters-input">
                                 <div class="text-danger small hidden" id="add_first_error">Letters only (no numbers)</div>
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="add_last_name">Last Name</label>
-                                <input type="text" name="last_name" id="add_last_name" placeholder="Last Name" required class="form-control">
+                                <input type="text" name="last_name" id="add_last_name" placeholder="Last Name" required class="form-control name-letters-input">
                                 <div class="text-danger small hidden" id="add_last_error">Letters only (no numbers)</div>
                             </div>
                         </div>
@@ -390,7 +393,7 @@
                         <!-- Student Number -->
                         <div class="mb-3">
                             <label class="form-label small fw-semibold text-secondary" for="edit_student_number">Student Number (3 Letters + 8 Numbers)</label>
-                            <input type="text" id="edit_student_number" name="student_number" required class="form-control text-uppercase">
+                            <input type="text" id="edit_student_number" name="student_number" maxlength="11" inputmode="text" autocomplete="off" required class="form-control text-uppercase student-number-input">
                             <div class="text-danger small hidden" id="edit_student_error">Must be 3 letters followed by 8 numbers (e.g., MAR87654320)</div>
                         </div>
 
@@ -398,12 +401,12 @@
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="edit_first_name">First Name</label>
-                                <input type="text" id="edit_first_name" name="first_name" required class="form-control">
+                                <input type="text" id="edit_first_name" name="first_name" required class="form-control name-letters-input">
                                 <div class="text-danger small hidden" id="edit_first_error">Letters only (no numbers)</div>
                             </div>
                             <div class="col-6">
                                 <label class="form-label small fw-semibold text-secondary" for="edit_last_name">Last Name</label>
-                                <input type="text" id="edit_last_name" name="last_name" required class="form-control">
+                                <input type="text" id="edit_last_name" name="last_name" required class="form-control name-letters-input">
                                 <div class="text-danger small hidden" id="edit_last_error">Letters only (no numbers)</div>
                             </div>
                         </div>
@@ -807,6 +810,7 @@
         function editStudent(student) {
             document.getElementById('editForm').action = '/registrar/students/' + student.id;
             document.getElementById('edit_student_number').value = student.student_number || '';
+            enforceStudentNumberFormat(document.getElementById('edit_student_number'));
             document.getElementById('edit_first_name').value = student.first_name || '';
             document.getElementById('edit_last_name').value = student.last_name || '';
             document.getElementById('edit_course').value = student.course || 'BSIT';
@@ -817,6 +821,54 @@
             document.getElementById('edit_status').value = student.status || 'Enrolled';
             openModal('editModal');
         }
+
+        // Live input mask: only allow 3 letters followed by 8 numbers.
+        function enforceStudentNumberFormat(input) {
+            const raw = input.value.toUpperCase();
+            let letters = '';
+            let digits = '';
+
+            for (const ch of raw) {
+                if (letters.length < 3) {
+                    if (/[A-Z]/.test(ch)) letters += ch;
+                } else if (digits.length < 8) {
+                    if (/[0-9]/.test(ch)) digits += ch;
+                }
+            }
+
+            const formatted = letters + digits;
+            if (input.value !== formatted) {
+                input.value = formatted;
+            }
+        }
+
+        document.querySelectorAll('.student-number-input').forEach(function (input) {
+            input.addEventListener('input', function () {
+                enforceStudentNumberFormat(input);
+            });
+            input.addEventListener('paste', function () {
+                setTimeout(function () { enforceStudentNumberFormat(input); }, 0);
+            });
+            enforceStudentNumberFormat(input);
+        });
+
+        // Live filter: names may contain letters, spaces, hyphens, and apostrophes only.
+        function enforceNameFormat(input) {
+            const cleaned = input.value.replace(/[^a-zA-Z\s'-]/g, '');
+            if (input.value !== cleaned) {
+                input.value = cleaned;
+            }
+        }
+
+        document.querySelectorAll('.name-letters-input').forEach(function (input) {
+            input.addEventListener('input', function () {
+                enforceNameFormat(input);
+            });
+            input.addEventListener('paste', function () {
+                setTimeout(function () { enforceNameFormat(input); }, 0);
+            });
+            enforceNameFormat(input);
+        });
 
         // Validation for Add Form
         function validateAddForm() {

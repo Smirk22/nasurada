@@ -136,6 +136,10 @@ class BackupController extends Controller
 
     private function backToBackups(): RedirectResponse
     {
-        return redirect()->to(route('adashboard').'#backups');
+        $route = auth()->check() && auth()->user()?->role === 'SuperAdmin'
+            ? route('superadmin.dashboard').'#backups'
+            : route('adashboard').'#backups';
+
+        return redirect()->to($route);
     }
 }

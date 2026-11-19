@@ -17,11 +17,7 @@ class GuardController extends Controller
      */
     public function dashboard(Request $request)
     {
-        // Security and Admin may open this page
-        $role = strtolower(trim(Auth::user()->role));
-        if ($role !== 'security' && $role !== 'admin') {
-            abort(403);
-        }
+        $this->authorizeGuardAccess();
 
         $today = today();
 
@@ -142,10 +138,7 @@ class GuardController extends Controller
      */
     public function latestScan()
     {
-        $role = strtolower(trim(Auth::user()->role));
-        if ($role !== 'security' && $role !== 'admin') {
-            abort(403);
-        }
+        $this->authorizeGuardAccess();
 
         // Newest activity first
         $log = EntryLog::whereDate('date', today())
@@ -264,10 +257,7 @@ class GuardController extends Controller
      */
     public function visitors()
     {
-        $role = strtolower(trim(Auth::user()->role));
-        if ($role !== 'security' && $role !== 'admin') {
-            abort(403);
-        }
+        $this->authorizeGuardAccess();
 
         return view('guards.visitors', [
             'visitors' => Visitor::active()->latest()->get(),
@@ -282,10 +272,7 @@ class GuardController extends Controller
      */
     public function visitorDestroy(Visitor $visitor)
     {
-        $role = strtolower(trim(Auth::user()->role));
-        if ($role !== 'security' && $role !== 'admin') {
-            abort(403);
-        }
+        $this->authorizeGuardAccess();
 
         $visitor->update(['removed_at' => now()]);
 
@@ -293,5 +280,17 @@ class GuardController extends Controller
             'success',
             "{$visitor->visitor_name} was removed. Their RFID tag is now available for a new visitor."
         );
+    }
+
+    /**
+     * Security, Admin and Super Admin may use the guard area.
+     */
+    private function authorizeGuardAccess(): void
+    {
+        $role = strtolower(trim((string) Auth::user()->role));
+
+        if (! in_array($role, ['security', 'admin', 'superadmin'], true)) {
+            abort(403);
+        }
     }
 }

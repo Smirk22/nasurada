@@ -59,6 +59,7 @@ class ForcedPasswordChangeController extends Controller
     private function dashboardPath(?string $role): string
     {
         return match (strtolower(trim((string) $role))) {
+            'superadmin' => '/superadmin',
             'admin' => '/adashboard',
             'security' => '/Security/dashboard',
             default => '/rdashboard',
