@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 // Send the home page to the login page
 Route::redirect('/', '/login')->name('home');
 
-// Login / Logout (no guest middleware, so /login always shows the form)
+// Login / Logout (signed-in users visiting /login are sent to their dashboard)
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.store');
 
@@ -77,8 +77,8 @@ Route::middleware(['auth', 'role:SuperAdmin'])->prefix('superadmin')->name('supe
     Route::put('/settings', [SuperAdminController::class, 'updateSettings'])->name('settings.update');
 });
 
-// Registrar Routes (registrar and admin)
-Route::middleware(['auth', 'role:Admin,Registrar'])->group(function () {
+// Registrar Routes (super admin, admin, and registrar)
+Route::middleware(['auth', 'role:SuperAdmin,Admin,Registrar'])->group(function () {
     Route::get('/rdashboard', [RegistrarController::class, 'dashboard'])->name('rdashboard');
     Route::get('/registrar/students', [RegistrarController::class, 'students'])->name('registrar.students');
     Route::post('/registrar/students', [RegistrarController::class, 'store'])->name('registrar.students.store');
@@ -97,6 +97,7 @@ Route::middleware(['auth', 'role:Admin,Registrar'])->group(function () {
 Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () {
     Route::get('/registrar/entry-logs', [EntryLogController::class, 'index'])->name('entry-logs.index');
     Route::get('/registrar/entry-logs/summary', [EntryLogController::class, 'summary'])->name('entry-logs.summary');
+    Route::get('/registrar/entry-logs/student', [EntryLogController::class, 'getByStudentNumber'])->name('entry-logs.getByStudentNumber');
     Route::get('/registrar/entry-logs/section/{section}', [EntryLogController::class, 'getBySection'])->name('entry-logs.getBySection');
     Route::post('/registrar/entry-logs', [EntryLogController::class, 'store'])->name('entry-logs.store');
 });
@@ -106,6 +107,7 @@ Route::middleware(['auth', 'role:Admin,Security'])->prefix('Security')->group(fu
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
     Route::get('/visitors', [GuardController::class, 'visitors'])->name('guard.visitors.index');
+    Route::get('/visitor-logs', [GuardController::class, 'visitorLogs'])->name('guard.visitor-logs.index');
     Route::delete('/visitors/{visitor}', [GuardController::class, 'visitorDestroy'])->name('guard.visitors.destroy');
     Route::get('/kiosk', [GuardController::class, 'kiosk'])->name('guard.kiosk');
     Route::get('/kiosk/latest', [GuardController::class, 'latestScan'])->name('guard.kiosk.latest');

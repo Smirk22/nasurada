@@ -233,6 +233,31 @@
                     </div>
                 </div>
 
+                <!-- Single Student Lookup -->
+                <div class="card page-card mb-4">
+                    <div class="card-body p-3 p-md-4">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-12 col-md-6 col-lg-5">
+                                <label for="studentNumberInput" class="form-label small text-muted fw-semibold text-uppercase mb-1">Find one student's entry logs</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-person-badge text-muted"></i></span>
+                                    <input type="text" id="studentNumberInput" class="form-control" placeholder="Enter student number (e.g. MAR87654321)" autocomplete="off" onkeydown="if (event.key === 'Enter') { event.preventDefault(); openStudentModal(); }">
+                                </div>
+                                <div class="form-text">Searches all dates and shows only this student's records.</div>
+                                <div class="form-text hidden" id="recentStudentNumberHint">
+                                    Most recent student number searched:
+                                    <button type="button" id="recentStudentNumber" class="btn btn-link btn-sm p-0 align-baseline font-monospace fw-semibold text-decoration-none" style="color: var(--ieti-green); font-size: inherit;"></button>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6 col-lg-7 d-flex flex-wrap gap-2 justify-content-start justify-content-md-end">
+                                <button type="button" onclick="openStudentModal()" class="btn btn-ieti btn-sm px-3">
+                                    <i class="bi bi-search me-1"></i> View student logs
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Year / Section groups (built from actual student records) -->
                 <div id="year-groups" class="vstack gap-3">
                     @foreach($yearLevels as $year => $sections)
@@ -355,6 +380,7 @@
     <script>
         const SUMMARY_URL = "{{ route('entry-logs.summary', [], false) }}";
         const SECTION_URL = "{{ route('entry-logs.getBySection', ['section' => '__SECTION__'], false) }}";
+        const STUDENT_URL = "{{ route('entry-logs.getByStudentNumber', [], false) }}";
         const TODAY = "{{ today()->toDateString() }}";
 
         // The filter always has a concrete date — clearing it returns to today.
@@ -362,8 +388,58 @@
             return document.getElementById('filterDate').value || TODAY;
         }
 
+        // Remember the last student number looked up here, like the Add Student
+        // hint does with the most recently entered number.
+        const RECENT_STUDENT_NUMBER_KEY = 'entryLogs.recentStudentNumber';
+
+        function recentStudentNumber() {
+            try {
+                return localStorage.getItem(RECENT_STUDENT_NUMBER_KEY) || '';
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function rememberStudentNumber(number) {
+            try {
+                localStorage.setItem(RECENT_STUDENT_NUMBER_KEY, number);
+            } catch (error) {
+                // Storage may be unavailable; the lookup itself still works.
+            }
+        }
+
+        function renderRecentStudentNumber() {
+            const input = document.getElementById('studentNumberInput');
+            const hint = document.getElementById('recentStudentNumberHint');
+            const button = document.getElementById('recentStudentNumber');
+            const recent = recentStudentNumber();
+
+            if (!input || !hint || !button) return;
+
+            if (!recent) {
+                hint.classList.add('hidden');
+                input.placeholder = 'Enter student number (e.g. MAR87654321)';
+                return;
+            }
+
+            hint.classList.remove('hidden');
+            button.textContent = recent;
+            button.setAttribute('aria-label', `Use student number ${recent}`);
+            input.placeholder = `e.g., ${recent}`;
+        }
+
+        document.getElementById('recentStudentNumber')?.addEventListener('click', function () {
+            const input = document.getElementById('studentNumberInput');
+
+            if (input) {
+                input.value = recentStudentNumber();
+                input.focus();
+            }
+        });
+
         let currentSection = null;
         let currentYear = null;
+        let currentStudentNumber = null;
         let modalTimer = null;
 
         // Pagination state for the section modal (server-side pagination)
@@ -391,8 +467,40 @@
         function openSectionModal(section, year) {
             currentSection = section;
             currentYear = year;
+            currentStudentNumber = null;
 
             document.getElementById('modalTitle').textContent = `Year ${year} — Section ${section}`;
+            document.getElementById('sectionModal').classList.remove('hidden');
+
+            currentPage = 1;
+            lastPage = 1;
+            totalEntries = 0;
+
+            loadSectionLogs();
+
+            clearInterval(modalTimer);
+            modalTimer = setInterval(loadSectionLogs, 4000);
+        }
+
+        // Open the same logs modal in single-student mode, ignoring the date
+        // filter so the full history for that student is shown.
+        function openStudentModal() {
+            const input = document.getElementById('studentNumberInput');
+            const number = (input?.value || '').trim();
+
+            if (!number) {
+                input?.focus();
+                return;
+            }
+
+            rememberStudentNumber(number);
+            renderRecentStudentNumber();
+
+            currentSection = null;
+            currentYear = null;
+            currentStudentNumber = number;
+
+            document.getElementById('modalTitle').textContent = `Student ${number}`;
             document.getElementById('sectionModal').classList.remove('hidden');
 
             currentPage = 1;
@@ -408,12 +516,20 @@
         // Fetch the selected section's entries (year-aware and always ordered newest first).
         // The endpoint paginates, so only one page is transferred and rendered at a time.
         async function loadSectionLogs() {
-            if (!currentSection) return;
+            const isStudentMode = !!currentStudentNumber;
+
+            if (!currentSection && !isStudentMode) return;
 
             const tableBody = document.getElementById('modalTableBody');
-            const params = new URLSearchParams({ year: currentYear, page: currentPage, date: selectedDate() });
+            let url;
 
-            const url = SECTION_URL.replace('__SECTION__', encodeURIComponent(currentSection)) + '?' + params.toString();
+            if (isStudentMode) {
+                const params = new URLSearchParams({ student_number: currentStudentNumber, page: currentPage });
+                url = STUDENT_URL + '?' + params.toString();
+            } else {
+                const params = new URLSearchParams({ year: currentYear, page: currentPage, date: selectedDate() });
+                url = SECTION_URL.replace('__SECTION__', encodeURIComponent(currentSection)) + '?' + params.toString();
+            }
 
             try {
                 const response = await fetch(url, {
@@ -421,9 +537,18 @@
                     cache: 'no-store'
                 });
 
-                if (!response.ok) throw new Error('HTTP ' + response.status);
+                const payload = await response.json().catch(() => ({}));
 
-                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload.error || 'HTTP ' + response.status);
+                }
+
+                if (isStudentMode && payload.student) {
+                    const student = payload.student;
+                    const fullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+                    document.getElementById('modalTitle').textContent =
+                        `${fullName || 'Student'} (${student.student_number || currentStudentNumber})`;
+                }
 
                 // Laravel paginator response: { data: [...], current_page, last_page, total, ... }
                 const data = Array.isArray(payload) ? payload : (payload.data || []);
@@ -449,7 +574,7 @@
                         <tr>
                             <td colspan="7" class="text-center text-muted py-5">
                                 <i class="bi bi-inbox d-block fs-2 mb-2"></i>
-                                No entry logs found for this section yet.
+                                ${isStudentMode ? 'No entry logs found for this student.' : 'No entry logs found for this section yet.'}
                             </td>
                         </tr>`;
                     return;
@@ -475,7 +600,7 @@
                 }).join('');
             } catch (error) {
                 console.error('Error:', error);
-                tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">Error loading data.</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${escapeHtml(error.message || 'Error loading data.')}</td></tr>`;
             }
         }
 
@@ -521,7 +646,7 @@
         }
 
         function changePage(delta) {
-            if (!currentSection) return;
+            if (!currentSection && !currentStudentNumber) return;
 
             const target = Math.min(lastPage, Math.max(1, currentPage + delta));
 
@@ -538,6 +663,7 @@
             modalTimer = null;
             currentSection = null;
             currentYear = null;
+            currentStudentNumber = null;
             currentPage = 1;
             lastPage = 1;
             totalEntries = 0;
@@ -568,7 +694,7 @@
             currentPage = 1;
             showSelectedDateLabel();
 
-            if (currentSection) {
+            if (currentSection || currentStudentNumber) {
                 loadSectionLogs();
             }
             // Explicit clicks must refresh even when the tab reports as hidden.
@@ -585,7 +711,7 @@
             currentPage = 1;
             showSelectedDateLabel();
 
-            if (currentSection) {
+            if (currentSection || currentStudentNumber) {
                 loadSectionLogs();
             }
             refreshSummary(true);
@@ -666,10 +792,11 @@
             if (event.target === this) closeSectionModal();
         });
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && currentSection) closeSectionModal();
+            if (event.key === 'Escape' && (currentSection || currentStudentNumber)) closeSectionModal();
         });
 
         showSelectedDateLabel();
+        renderRecentStudentNumber();
         refreshSummary();
         setInterval(refreshSummary, 4000);
     </script>

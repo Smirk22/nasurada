@@ -8,6 +8,7 @@ use App\Models\Student;
 use App\Models\Visitor;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 
 class GuardController extends Controller
@@ -22,7 +23,9 @@ class GuardController extends Controller
         $today = today();
 
         // Live feed: Show today's last scanned students (unique per student/log)
-        $entryLogs = EntryLog::whereDate('date', $today)
+        $feedPerPage = 10;
+        $feedPage = max(1, (int) $request->query('feed_page', 1));
+        $feedLogs = EntryLog::whereDate('date', $today)
             ->with(['student', 'visitor'])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
@@ -30,7 +33,19 @@ class GuardController extends Controller
             ->unique(function ($item) {
                 return $item->student_id ? 'student_'.$item->student_id : 'log_'.$item->id;
             })
-            ->take(10);
+            ->values();
+
+        $entryLogs = new LengthAwarePaginator(
+            $feedLogs->forPage($feedPage, $feedPerPage)->values(),
+            $feedLogs->count(),
+            $feedPerPage,
+            $feedPage,
+            [
+                'path' => $request->url(),
+                'pageName' => 'feed_page',
+                'query' => $request->query(),
+            ]
+        );
 
         $studentsVerifiedToday = EntryLog::whereDate('date', $today)
             ->where('status', 'granted')
@@ -203,9 +218,9 @@ class GuardController extends Controller
     {
         $validated = $request->validate([
             'visitor_name' => 'required|string|max:255',
-            'id_type' => 'required|in:drivers_license,passport,national_id',
+            'id_type' => 'required|in:drivers_license,passport,national_id,registration_card',
             'id_number' => 'required|string|max:50',
-            'visiting_department' => 'required|string',
+            'visiting_department' => 'required|string|max:255',
             'rfid_tag' => 'required|string|max:32',
         ]);
 
@@ -262,6 +277,25 @@ class GuardController extends Controller
         return view('guards.visitors', [
             'visitors' => Visitor::active()->latest()->get(),
             'removedCount' => Visitor::whereNotNull('removed_at')->count(),
+        ]);
+    }
+
+    /**
+     * Display today's visitor scan logs.
+     */
+    public function visitorLogs()
+    {
+        $this->authorizeGuardAccess();
+
+        $visitorLogs = EntryLog::whereDate('date', today())
+            ->whereNotNull('visitor_id')
+            ->with('visitor')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return view('guards.visitor-logs', [
+            'visitorLogs' => $visitorLogs,
         ]);
     }
 

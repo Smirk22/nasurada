@@ -16,6 +16,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminController extends Controller
 {
+    /** Roles the Admin dashboard is allowed to see and manage. */
+    private const MANAGEABLE_ROLES = ['Registrar', 'Security'];
+
     public function dashboard(BackupService $backups)
     {
         $totalUsers = User::count();
@@ -35,7 +38,11 @@ class AdminController extends Controller
         $validScans = EntryLog::where('status', 'granted')->count();
         $invalidScans = EntryLog::whereIn('status', ['denied', 'unknown', 'expired'])->count();
 
-        $users = User::all();
+        $users = User::query()
+            ->whereRaw("LOWER(COALESCE(role, '')) <> ?", ['superadmin'])
+            ->orderBy('role')
+            ->orderBy('name')
+            ->get();
         // The admin monitor covers staff activity only; Super Admin actions
         // stay in the Super Admin audit log.
         $activities = ActivityLog::query()
@@ -107,7 +114,7 @@ class AdminController extends Controller
             'username' => 'required|string|unique:accounts,username',
             'email' => 'required|email|unique:accounts,email',
             'password' => ['required', 'string', Password::default()],
-            'role' => ['required', Rule::in(['Admin', 'Registrar', 'Security'])],
+            'role' => ['required', Rule::in(self::MANAGEABLE_ROLES)],
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -130,10 +137,10 @@ class AdminController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|unique:accounts,username,'.$user->id,
             'email' => 'required|email|unique:accounts,email,'.$user->id,
-            'role' => ['required', Rule::in(['Admin', 'Registrar', 'Security'])],
+            'role' => ['required', Rule::in(self::MANAGEABLE_ROLES)],
         ]);
 
-        $this->guardSuperAdminAccount($user);
+        $this->guardManagedAccount($user);
 
         $user->update($validated);
 
@@ -149,7 +156,7 @@ class AdminController extends Controller
 
     public function generateTemporaryPassword(User $user)
     {
-        $this->guardSuperAdminAccount($user);
+        $this->guardManagedAccount($user);
 
         $temporaryPassword = Str::password(16);
 
@@ -173,7 +180,7 @@ class AdminController extends Controller
 
     public function destroyUser(User $user)
     {
-        $this->guardSuperAdminAccount($user);
+        $this->guardManagedAccount($user);
 
         $username = $user->username;
         $user->delete();
@@ -207,7 +214,7 @@ class AdminController extends Controller
         return response()->streamDownload(function () use ($query) {
             echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
             echo '<table border="1"><thead><tr>';
-            foreach (['Date', 'Time In', 'Time Out', 'Status', 'Student No', 'Name', 'Year', 'Section', 'Reason'] as $h) {
+            foreach (['Student No', 'Name', 'Year', 'Section', 'Time In', 'Time Out', 'Status', 'Date', 'Reason for access denied'] as $h) {
                 echo '<th>'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
             }
             echo '</tr></thead><tbody>';
@@ -216,15 +223,15 @@ class AdminController extends Controller
                     $s = $log->student;
                     $name = $s ? trim($s->first_name.' '.($s->middle_name ? $s->middle_name.' ' : '').$s->last_name) : '';
                     echo '<tr>';
-                    echo '<td>'.htmlspecialchars((string) $log->date, ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->time_in ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->time_out ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) $log->status, ENT_QUOTES, 'UTF-8').'</td>';
                     echo '<td>'.htmlspecialchars((string) ($s?->student_number ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
                     echo '<td>'.htmlspecialchars($name, ENT_QUOTES, 'UTF-8').'</td>';
                     echo '<td>'.htmlspecialchars((string) ($s?->year_level ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
                     echo '<td>'.htmlspecialchars((string) ($s?->section ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->reason ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
+                    echo '<td>'.htmlspecialchars((string) ($log->time_in ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
+                    echo '<td>'.htmlspecialchars((string) ($log->time_out ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
+                    echo '<td>'.htmlspecialchars((string) $log->status, ENT_QUOTES, 'UTF-8').'</td>';
+                    echo '<td>'.htmlspecialchars((string) $log->date, ENT_QUOTES, 'UTF-8').'</td>';
+                    echo '<td>'.htmlspecialchars((string) ($log->reason ?: 'N/A'), ENT_QUOTES, 'UTF-8').'</td>';
                     echo '</tr>';
                 }
             });
@@ -233,12 +240,14 @@ class AdminController extends Controller
     }
 
     /**
-     * Super Admin accounts are managed only from the Super Admin control center.
+     * Admin and Super Admin accounts are managed exclusively from the
+     * Super Admin control center. This dashboard may only touch the roles
+     * listed in MANAGEABLE_ROLES.
      */
-    private function guardSuperAdminAccount(User $user): void
+    private function guardManagedAccount(User $user): void
     {
-        if ($user->role === 'SuperAdmin') {
-            abort(403, 'Super Admin accounts can only be managed from the Super Admin control center.');
+        if (! in_array($user->role, self::MANAGEABLE_ROLES, true)) {
+            abort(403, 'This account can only be managed from the Super Admin dashboard.');
         }
     }
 }

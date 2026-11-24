@@ -309,7 +309,7 @@
                     <div class="flex justify-between items-center shrink-0">
                         <div>
                             <h2 class="text-lg font-bold text-gray-800">User Account Management</h2>
-                            <p class="text-xs text-gray-500">Manage staff access roles (Admin, Registrar, Security Guard).</p>
+                            <p class="text-xs text-gray-500">Manage Registrar and Security Guard accounts. Admin and Super Admin accounts are managed in the Super Admin dashboard.</p>
                         </div>
                         <button onclick="openModal('addUserModal')" class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition">
                             + Create Staff User
@@ -345,9 +345,11 @@
                                         </td>
                                         <td class="p-3">
                                             <div class="flex flex-wrap items-center gap-1.5">
+                                                @if ($user->role !== 'Admin')
                                                 <button type="button" title="Generate temporary password" aria-label="Generate temporary password" onclick="openGenerateTempPasswordModal({{ $user->id }}, {{ json_encode($user->email) }}, {{ json_encode($user->username) }})" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-ieti-green hover:bg-green-800 text-white shadow-sm transition">
                                                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true"><path fill-rule="evenodd" d="M15.75 1.5a6.75 6.75 0 0 0-6.651 7.906c.067.39-.032.717-.221.906l-6.5 6.499a3 3 0 0 0-.849 2.121v2.818h2.818a3 3 0 0 0 2.121-.85l6.499-6.5c.19-.189.517-.288.906-.22A6.75 6.75 0 1 0 15.75 1.5Zm0 3a.75.75 0 0 0 0 1.5A2.25 2.25 0 0 1 18 8.25a.75.75 0 0 0 1.5 0 3.75 3.75 0 0 0-3.75-3.75Z" clip-rule="evenodd" /></svg>
                                                 </button>
+                                                @endif
                                                 @if ($user->temporary_password)
                                                     <code data-temp-password="{{ $user->temporary_password }}" class="temp-password-value px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs font-mono text-amber-900 select-all">{{ $user->temporary_password }}</code>
                                                     <button type="button" onclick="copyTableTempPassword(this)" class="px-2 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded">Copy</button>
@@ -357,12 +359,16 @@
                                             </div>
                                         </td>
                                         <td class="p-3 text-center space-x-2">
-                                            <button onclick="editUser({{ json_encode($user) }})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Edit Role</button>
-                                            <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this user?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">Delete</button>
-                                            </form>
+                                            @if ($user->role === 'Admin')
+                                                <span class="text-xs text-gray-400">Managed by Super Admin</span>
+                                            @else
+                                                <button onclick="editUser({{ json_encode($user) }})" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Edit Role</button>
+                                                <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this user?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2">Delete</button>
+                                                </form>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -392,7 +398,6 @@
                     <select name="role" class="w-full border p-2 rounded text-sm mt-1">
                         <option value="Registrar">Registrar</option>
                         <option value="Security">Security Guard</option>
-                        <option value="Admin">Administrator</option>
                     </select>
                 </div>
                 <div class="flex justify-end space-x-2 mt-4">
@@ -419,7 +424,6 @@
                     <select id="edit_user_role" name="role" class="w-full border p-2 rounded text-sm mt-1">
                         <option value="Registrar">Registrar</option>
                         <option value="Security">Security Guard</option>
-                        <option value="Admin">Administrator</option>
                     </select>
                 </div>
                 <div class="flex justify-end space-x-2 mt-4">
@@ -640,6 +644,11 @@
             openModal('generateTempPasswordModal');
         }
         function editUser(user) {
+            if (user.role === 'Admin') {
+                alert('Admin accounts can only be edited from the Super Admin dashboard.');
+                return;
+            }
+
             document.getElementById('editUserForm').action = '/admin/users/' + user.id;
             document.getElementById('edit_user_name').value = user.name || '';
             document.getElementById('edit_user_username').value = user.username || '';
@@ -678,7 +687,7 @@
             if (subtitle) {
                 if (tab === 'backups') subtitle.textContent = 'Create, download, restore, and manage system backup archives.';
                 else if (tab === 'reports') subtitle.textContent = 'Export system reports and logs.';
-                else if (tab === 'users') subtitle.textContent = 'Manage staff access roles (Admin, Registrar, Security Guard).';
+                else if (tab === 'users') subtitle.textContent = 'Manage Registrar and Security Guard accounts. Admin and Super Admin accounts are managed in the Super Admin dashboard.';
                 else subtitle.textContent = 'System administration and staff account overview.';
             }
 

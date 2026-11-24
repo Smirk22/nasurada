@@ -22,12 +22,12 @@ class PaginationTest extends TestCase
         ]);
     }
 
-    private function student(int $index, string $section = 'S1B1', string $firstName = 'Student'): Student
+    private function student(int $index, string $section = 'S1B1', string $firstName = 'Student', string $lastName = 'Sample'): Student
     {
         return Student::create([
             'student_number' => 'TST'.str_pad((string) $index, 8, '0', STR_PAD_LEFT),
             'first_name' => $firstName,
-            'last_name' => 'Sample',
+            'last_name' => $lastName,
             'course' => 'BSIT',
             'year_level' => 1,
             'section' => $section,
@@ -74,6 +74,50 @@ class PaginationTest extends TestCase
         $paginator = $response->viewData('students');
         $this->assertSame(3, $paginator->total());
         $this->assertStringContainsString('search=Juan', $paginator->url(1));
+    }
+
+    public function test_student_search_matches_full_names(): void
+    {
+        $this->student(1, firstName: 'Ashley', lastName: 'Santos');
+        $this->student(2, firstName: 'Carlos', lastName: 'Reyes');
+
+        $registrar = $this->registrar();
+
+        foreach (['Ashley Santos', 'Santos Ashley', 'ashley santos', '  Ashley   Santos  ', 'Santos, Ashley'] as $term) {
+            $response = $this->actingAs($registrar)
+                ->get(route('registrar.students', ['search' => $term]));
+
+            $response->assertOk();
+            $this->assertSame(1, $response->viewData('students')->total(), $term);
+        }
+    }
+
+    public function test_student_search_matches_student_numbers(): void
+    {
+        $this->student(1, firstName: 'Ashley', lastName: 'Santos');
+        $this->student(2, firstName: 'Carlos', lastName: 'Reyes');
+
+        $registrar = $this->registrar();
+
+        foreach (['TST00000001', 'tst00000001', '00000001', 'TST 00000001', 'TST-00000001', '#TST00000001'] as $term) {
+            $response = $this->actingAs($registrar)
+                ->get(route('registrar.students', ['search' => $term]));
+
+            $response->assertOk();
+            $this->assertSame(1, $response->viewData('students')->total(), $term);
+        }
+    }
+
+    public function test_student_search_accepts_punctuation_in_names(): void
+    {
+        $this->student(1, firstName: 'Jean-Luc', lastName: "D'Angelo");
+        $this->student(2, firstName: 'Ashley', lastName: 'Santos');
+
+        $response = $this->actingAs($this->registrar())
+            ->get(route('registrar.students', ['search' => "Jean-Luc D'Angelo"]));
+
+        $response->assertOk();
+        $this->assertSame(1, $response->viewData('students')->total());
     }
 
     public function test_entry_logs_by_section_are_paginated(): void

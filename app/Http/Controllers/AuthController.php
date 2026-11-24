@@ -15,10 +15,7 @@ class AuthController extends Controller
     public function showLoginForm(Request $request)
     {
         if (Auth::check()) {
-            $request->session()->forget('guard_logged_in_at');
-            Auth::logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
+            return $this->redirectToDashboard($request, Auth::user());
         }
 
         [$a, $b] = $this->issueLoginCaptcha($request);

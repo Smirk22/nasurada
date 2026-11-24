@@ -141,7 +141,7 @@
 
             <!-- Bottom dark green footer bar -->
             <footer class="auth-panel__bar auth-panel__bar--footer">
-                <span>&copy; {{ date('Y') }} IETI College</span>
+                <span>&copy; {{ date('Y') }} IETI College Marikina</span>
                 <span class="d-none d-sm-inline">Student Entry Verification System</span>
             </footer>
         </section>

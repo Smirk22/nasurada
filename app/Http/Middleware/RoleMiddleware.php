@@ -20,16 +20,19 @@ class RoleMiddleware
             return redirect()->route('password.force-change');
         }
 
+        $role = strtolower(trim((string) $user->role));
+        $allowedRoles = array_map(static fn (string $allowed): string => strtolower(trim($allowed)), $roles);
+
         // A Super Admin may use every area of the system.
-        if ($user->role === 'SuperAdmin') {
+        if ($role === 'superadmin') {
             return $next($request);
         }
 
-        if (! in_array($user->role, $roles)) {
-            return match ($user->role) {
-                'Admin' => redirect()->route('adashboard'),
-                'Registrar' => redirect()->route('rdashboard'),
-                'Security' => redirect()->route('guard.dashboard'),
+        if (! in_array($role, $allowedRoles, true)) {
+            return match ($role) {
+                'admin' => redirect()->route('adashboard'),
+                'registrar' => redirect()->route('rdashboard'),
+                'security' => redirect()->route('guard.dashboard'),
                 default => abort(403),
             };
         }

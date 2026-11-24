@@ -79,6 +79,52 @@ class EntryLogController extends Controller
     }
 
     /**
+     * Get every entry log for one student, looked up by student number.
+     * An exact match wins; a unique partial match is accepted as well.
+     */
+    public function getByStudentNumber(Request $request)
+    {
+        $number = strtoupper((string) preg_replace('/[\s-]+/', '', trim((string) $request->input('student_number'))));
+
+        if ($number === '') {
+            return response()->json(['error' => 'Enter a student number.'], 422);
+        }
+
+        $student = Student::query()->where('student_number', $number)->first();
+
+        if (! $student) {
+            $matches = Student::query()
+                ->where('student_number', 'like', "%{$number}%")
+                ->limit(2)
+                ->get();
+
+            if ($matches->count() === 1) {
+                $student = $matches->first();
+            } elseif ($matches->isEmpty()) {
+                return response()->json(['error' => 'No student found with that student number.'], 404);
+            } else {
+                return response()->json(['error' => 'More than one student matches that number. Enter the full student number.'], 422);
+            }
+        }
+
+        $logs = EntryLog::query()
+            ->where('student_id', $student->id)
+            ->with('student:id,student_number,first_name,last_name,year_level,section')
+            ->orderByDesc('date')
+            ->orderByDesc('time_in')
+            ->orderByDesc('id')
+            ->paginate(self::LOGS_PER_PAGE);
+
+        return response()->json(array_merge($logs->toArray(), [
+            'student' => [
+                'student_number' => $student->student_number,
+                'first_name' => $student->first_name,
+                'last_name' => $student->last_name,
+            ],
+        ]));
+    }
+
+    /**
      * Verified entry counts for the selected date (today by default),
      * grouped by "year|section". Polled by the Entry Logs page.
      */

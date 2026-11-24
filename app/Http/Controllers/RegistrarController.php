@@ -32,7 +32,6 @@ class RegistrarController extends Controller
     public function dashboard()
     {
         $totalStudents = Student::count();
-        $unassignedRfids = Student::whereNull('rfid_tag')->orWhere('rfid_tag', '')->count();
         $entriesToday = EntryLog::whereDate('date', today())
             ->where('status', 'granted')
             ->count();
@@ -47,21 +46,6 @@ class RegistrarController extends Controller
             ->orderBy('section')
             ->get()
             ->groupBy('year_level');
-
-        // Students missing RFID / photo (preview lists)
-        $missingRfidStudents = Student::query()
-            ->where(fn ($q) => $q->whereNull('rfid_tag')->orWhere('rfid_tag', ''))
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->take(10)
-            ->get(['id', 'first_name', 'last_name', 'student_number', 'year_level', 'section']);
-
-        $missingPhotoStudents = Student::query()
-            ->where(fn ($q) => $q->whereNull('photo')->orWhere('photo', ''))
-            ->orderBy('last_name')
-            ->orderBy('first_name')
-            ->take(10)
-            ->get(['id', 'first_name', 'last_name', 'student_number', 'year_level', 'section']);
 
         // Today's granted entries grouped by section
         $entrySummaryToday = EntryLog::query()
@@ -86,17 +70,17 @@ class RegistrarController extends Controller
                 $q->where('action', 'like', '%Student%')
                     ->orWhere('action', 'End of Semester Triggered');
             })
+            // Administrative actions belong in the Admin / Super Admin audit
+            // logs, not in the Registrar's recent student activity.
+            ->whereRaw("LOWER(COALESCE(role, '')) NOT IN (?, ?)", ['admin', 'superadmin'])
             ->latest()
             ->take(10)
             ->get();
 
         return view('rdashboard', compact(
             'totalStudents',
-            'unassignedRfids',
             'entriesToday',
             'sectionBreakdown',
-            'missingRfidStudents',
-            'missingPhotoStudents',
             'entrySummaryToday',
             'enrollmentStatus',
             'recentActivities'
@@ -108,12 +92,21 @@ class RegistrarController extends Controller
         $query = Student::query();
 
         if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                    ->orWhere('last_name', 'like', "%{$search}%")
-                    ->orWhere('student_number', 'like', "%{$search}%");
-            });
+            // Match each word against the name/number columns so searches such
+            // as "Juan Cruz" or "MAR-87654321" find the right student.
+            $terms = preg_split('/[^\p{L}\p{N}]+/u', trim((string) $request->input('search')));
+
+            foreach ($terms as $term) {
+                if ($term === '') {
+                    continue;
+                }
+
+                $query->where(function ($q) use ($term) {
+                    $q->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhere('student_number', 'like', "%{$term}%");
+                });
+            }
         }
 
         if ($request->filled('year') && $request->year !== 'All Years') {
@@ -146,7 +139,14 @@ class RegistrarController extends Controller
             ->latest('id')
             ->value('student_number');
 
-        return view('registrar.students', compact('students', 'assignedRfidOwners', 'latestStudentNumber'));
+        $totalStudents = Student::count();
+
+        return view('registrar.students', compact(
+            'students',
+            'assignedRfidOwners',
+            'latestStudentNumber',
+            'totalStudents'
+        ));
     }
 
     public function store(Request $request)

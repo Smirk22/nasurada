@@ -126,12 +126,9 @@
                         <button type="button" class="btn btn-ieti fw-semibold" data-bs-toggle="modal" data-bs-target="#addModal">
                             <i class="bi bi-person-plus-fill me-1"></i> Add New Student
                         </button>
-                        <form action="{{ route('registrar.students.unenrollAll') }}" method="POST" onsubmit="return confirm('WARNING: Are you sure you want to end the semester? This will set ALL students to Unenrolled and clear all assigned RFID tags.');">
-                            @csrf
-                            <button type="submit" class="btn btn-outline-danger fw-semibold">
-                                <i class="bi bi-calendar-x me-1"></i> End of Semester
-                            </button>
-                        </form>
+                        <button type="button" class="btn btn-outline-danger fw-semibold" data-bs-toggle="modal" data-bs-target="#endSemesterModal">
+                            <i class="bi bi-calendar-x me-1"></i> End of Semester
+                        </button>
                     </div>
                 </div>
             </div>
@@ -226,13 +223,12 @@
                                             <button type="button" onclick="editStudent({{ json_encode($student) }})" class="btn btn-sm btn-outline-primary" title="Edit / RFID">
                                                 <i class="bi bi-pencil-square"></i>
                                             </button>
-                                            <form action="{{ route('registrar.students.destroy', $student->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this student permanently?');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete"
+                                                    data-bs-toggle="modal" data-bs-target="#deleteStudentModal"
+                                                    data-student-name="{{ $student->first_name }} {{ $student->last_name }}"
+                                                    data-delete-url="{{ route('registrar.students.destroy', $student->id) }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -348,9 +344,9 @@
                             <div class="form-text">Receives an SMS confirmation when the student enters the school premises.</div>
                         </div>
 
-                        <!-- RFID Tag (Optional) -->
-                        <div class="rfid-picker">
-                            <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag (Optional)</label>
+                        <!-- RFID Tag -->
+                        <div class="rfid-picker" id="add_rfid_picker">
+                            <label class="form-label small fw-semibold text-secondary" for="add_rfid_tag">RFID Tag</label>
                             <div class="input-group">
                                 <input type="text" name="rfid_tag" id="add_rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off">
                                 <button type="button" class="btn btn-outline-secondary" id="add_rfid_toggle" aria-label="Show RFID scan options">
@@ -443,14 +439,29 @@
                         <!-- Phone Number -->
                         <div class="mb-3">
                             <label class="form-label small fw-semibold text-secondary" for="edit_phone_number">Phone Number</label>
-                            <input type="tel" id="edit_phone_number" name="phone_number" placeholder="e.g., 09171234567" class="form-control" autocomplete="off">
-                            <div class="text-danger small hidden" id="edit_phone_error">Enter a valid PH mobile number (e.g., 09171234567 or +639171234567)</div>
+                            <input type="tel" id="edit_phone_number" name="phone_number" placeholder="e.g., 09171234567" class="form-control phone-number-input" inputmode="numeric" pattern="[0-9]{11}" maxlength="11" autocomplete="off">
+                            <div class="text-danger small hidden" id="edit_phone_error">Enter an 11-digit PH mobile number (e.g., 09171234567)</div>
                         </div>
 
                         <!-- RFID Tag Assignment -->
-                        <div class="mb-3">
+                        <div class="rfid-picker mb-3" id="edit_rfid_picker">
                             <label class="form-label small fw-semibold text-secondary" for="edit_rfid_tag">RFID Tag Assignment</label>
-                            <input type="text" id="edit_rfid_tag" name="rfid_tag" placeholder="Scan or enter RFID Tag" class="form-control">
+                            <div class="input-group">
+                                <input type="text" id="edit_rfid_tag" name="rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off">
+                                <button type="button" class="btn btn-outline-secondary" id="edit_rfid_toggle" aria-label="Show RFID scan options">
+                                    <i class="bi bi-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="rfid-dropdown d-none" id="edit_rfid_dropdown">
+                                <div class="p-2">
+                                    <button type="button" class="btn btn-ieti btn-sm w-100 fw-semibold" id="edit_scan_rfid_btn">
+                                        <i class="bi bi-upc-scan me-1"></i> Scan an RFID
+                                    </button>
+                                    <input type="text" id="edit_scan_rfid_input" class="form-control form-control-sm mt-2 d-none" placeholder="Scan the card or type the tag, then press Enter" autocomplete="off">
+                                    <div class="small text-muted mt-1 d-none" id="edit_scan_rfid_hint">Waiting for an RFID scan...</div>
+                                    <div class="small text-danger mt-2 d-none" id="edit_rfid_warning"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Status -->
@@ -471,6 +482,67 @@
         </div>
     </div>
 
+    <!-- End of Semester Confirmation Modal -->
+    <div class="modal fade" id="endSemesterModal" tabindex="-1" aria-labelledby="endSemesterModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form action="{{ route('registrar.students.unenrollAll') }}" method="POST">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-danger" id="endSemesterModalLabel">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> End the current semester?
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            This will affect <strong>{{ $totalStudents }}</strong> student record{{ $totalStudents === 1 ? '' : 's' }}:
+                        </p>
+                        <ul class="small text-secondary mb-0">
+                            <li>Every student will be marked <strong>Unenrolled</strong>.</li>
+                            <li>All <strong>{{ count($assignedRfidOwners) }}</strong> assigned RFID tags will be cleared.</li>
+                        </ul>
+                        <p class="text-danger small fw-semibold mt-3 mb-0">This action cannot be undone.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">Yes, end semester</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Student Confirmation Modal -->
+    <div class="modal fade" id="deleteStudentModal" tabindex="-1" aria-labelledby="deleteStudentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="deleteStudentForm" method="POST">
+                    @csrf
+                    @method('DELETE')
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold text-danger" id="deleteStudentModalLabel">
+                            <i class="bi bi-trash-fill me-2"></i> Delete student record
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">
+                            Permanently delete <strong id="deleteStudentName">this student</strong>?
+                        </p>
+                        <p class="text-danger small fw-semibold mb-0">
+                            The record will be removed from the system and cannot be recovered.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger fw-semibold">Yes, delete student</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     {{-- Bootstrap JS (modals) --}}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -480,18 +552,19 @@
             bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).show();
         }
 
+        document.getElementById('deleteStudentModal')?.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            if (!button) {
+                return;
+            }
+
+            document.getElementById('deleteStudentName').textContent = button.dataset.studentName || 'this student';
+            document.getElementById('deleteStudentForm').action = button.dataset.deleteUrl;
+        });
+
         function closeModal(id) {
             bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).hide();
         }
-
-        // RFID picker for the Add Student modal
-        const addRfidInput = document.getElementById('add_rfid_tag');
-        const addRfidToggle = document.getElementById('add_rfid_toggle');
-        const addRfidDropdown = document.getElementById('add_rfid_dropdown');
-        const scanRfidBtn = document.getElementById('scan_rfid_btn');
-        const scanRfidInput = document.getElementById('scan_rfid_input');
-        const scanRfidHint = document.getElementById('scan_rfid_hint');
-        const addRfidWarning = document.getElementById('add_rfid_warning');
 
         const rfidScanModeUrl = '{{ route('registrar.rfid.scan-mode') }}';
         const rfidScanModeCancelUrl = '{{ route('registrar.rfid.scan-mode.cancel') }}';
@@ -499,141 +572,16 @@
         const csrfToken = document.querySelector('#addModal input[name="_token"]').value;
 
         const assignedRfidOwners = @json($assignedRfidOwners ?? []);
-        let scanCommitTimer = null;
+        let activeRfidPicker = null;
 
         function normalizeRfid(value) {
             return (value || '').replace(/\s+/g, '').toUpperCase();
         }
 
-        function clearRfidWarning() {
-            addRfidWarning.textContent = '';
-            addRfidWarning.classList.add('d-none');
-        }
-
-        function showRfidWarning(message) {
-            addRfidWarning.textContent = message;
-            addRfidWarning.classList.remove('d-none');
-            openRfidDropdown();
-        }
-
-        function commitScannedRfid(value, owner) {
-            cancelRegistrationScan();
-
-            const tag = normalizeRfid(value);
-
-            if (!tag) {
-                return false;
-            }
-
-            const assignedOwner = owner || assignedRfidOwners[tag];
-
-            if (assignedOwner) {
-                addRfidInput.value = '';
-                scanRfidInput.value = '';
-                scanRfidInput.classList.add('d-none');
-                scanRfidHint.classList.add('d-none');
-                showRfidWarning(tag + ' is already assigned to ' + assignedOwner + '.');
-                window.alert('This rfid is already registered');
-
-                return false;
-            }
-
-            clearRfidWarning();
-
-            addRfidInput.value = tag;
-            scanRfidInput.value = '';
-            scanRfidInput.classList.add('d-none');
-            scanRfidHint.classList.add('d-none');
-            closeRfidDropdown();
-
-            return true;
-        }
-
-        function scheduleScanCommit(input) {
-            clearTimeout(scanCommitTimer);
-            scanCommitTimer = setTimeout(function () {
-                if (normalizeRfid(input.value)) {
-                    commitScannedRfid(input.value);
-                }
-            }, 400);
-        }
-
-        function openRfidDropdown() {
-            addRfidDropdown.classList.remove('d-none');
-        }
-
-        function closeRfidDropdown() {
-            addRfidDropdown.classList.add('d-none');
-            scanRfidInput.classList.add('d-none');
-            scanRfidHint.classList.add('d-none');
-            clearRfidWarning();
-            cancelRegistrationScan();
-        }
-
-        addRfidInput.addEventListener('click', openRfidDropdown);
-        addRfidInput.addEventListener('input', function () {
-            clearRfidWarning();
-            scheduleScanCommit(addRfidInput);
-        });
-        addRfidInput.addEventListener('keydown', function (event) {
-            if (event.key !== 'Enter') {
-                return;
-            }
-
-            event.preventDefault();
-            commitScannedRfid(addRfidInput.value);
-        });
-        addRfidToggle.addEventListener('click', function (event) {
-            event.preventDefault();
-
-            if (addRfidDropdown.classList.contains('d-none')) {
-                openRfidDropdown();
-            } else {
-                closeRfidDropdown();
-            }
-        });
-
-        scanRfidBtn.addEventListener('click', function () {
-            clearRfidWarning();
-            scanRfidInput.value = '';
-            scanRfidInput.classList.remove('d-none');
-            scanRfidHint.classList.remove('d-none');
-            scanRfidInput.focus();
-            beginRegistrationScan();
-        });
-
-        scanRfidInput.addEventListener('input', function () {
-            clearRfidWarning();
-            cancelRegistrationScan();
-            scheduleScanCommit(scanRfidInput);
-        });
-
-        scanRfidInput.addEventListener('keydown', function (event) {
-            if (event.key !== 'Enter') {
-                return;
-            }
-
-            event.preventDefault();
-            cancelRegistrationScan();
-            commitScannedRfid(scanRfidInput.value);
-        });
-
-        document.addEventListener('click', function (event) {
-            if (!addRfidDropdown.classList.contains('d-none') && !event.target.closest('.rfid-picker')) {
-                closeRfidDropdown();
-            }
-        });
-
-        document.getElementById('addModal').addEventListener('hidden.bs.modal', function () {
-            clearTimeout(scanCommitTimer);
-            clearRfidWarning();
-            closeRfidDropdown();
-        });
-
-        document.getElementById('addModal').addEventListener('shown.bs.modal', beginRegistrationScan);
-
         // Registration scan mode: while armed, the API captures taps for the
         // registrar instead of adding them to the guard's live entry feed.
+        // Only one picker can be armed at a time because the server keeps a
+        // single registration context.
         let rfidPollTimer = null;
         let rfidPolling = false;
         let registrationScanArmed = false;
@@ -694,19 +642,19 @@
             lastScanNonce = null;
 
             rfidPollTimer = setInterval(function () {
-                if (!rfidPolling) {
+                if (!rfidPolling || !activeRfidPicker) {
                     return;
                 }
 
                 fetchLatestRfid().then(function (latest) {
-                    if (!rfidPolling || !latest || !latest.uid || latest.nonce === lastScanNonce) {
+                    if (!rfidPolling || !activeRfidPicker || !latest || !latest.uid || latest.nonce === lastScanNonce) {
                         return;
                     }
 
                     lastScanNonce = latest.nonce;
                     registrationScanArmed = false;
                     stopRfidPolling();
-                    commitScannedRfid(latest.uid, latest.owner);
+                    activeRfidPicker.commit(latest.uid, latest.owner);
                 });
             }, 1000);
         }
@@ -719,6 +667,205 @@
                 rfidPollTimer = null;
             }
         }
+
+        function createRfidPicker(config) {
+            const picker = {
+                container: document.getElementById(config.container),
+                input: document.getElementById(config.input),
+                toggle: document.getElementById(config.toggle),
+                dropdown: document.getElementById(config.dropdown),
+                scanBtn: document.getElementById(config.scanBtn),
+                scanInput: document.getElementById(config.scanInput),
+                scanHint: document.getElementById(config.scanHint),
+                warning: document.getElementById(config.warning),
+                modal: document.getElementById(config.modal),
+                scanCommitTimer: null,
+                allowedTag: '',
+
+                clearWarning: function () {
+                    picker.warning.textContent = '';
+                    picker.warning.classList.add('d-none');
+                },
+
+                showWarning: function (message) {
+                    picker.warning.textContent = message;
+                    picker.warning.classList.remove('d-none');
+                    picker.openDropdown();
+                },
+
+                openDropdown: function () {
+                    picker.dropdown.classList.remove('d-none');
+                },
+
+                closeDropdown: function () {
+                    picker.dropdown.classList.add('d-none');
+                    picker.scanInput.classList.add('d-none');
+                    picker.scanHint.classList.add('d-none');
+                    picker.clearWarning();
+
+                    if (activeRfidPicker === picker) {
+                        cancelRegistrationScan();
+                    }
+                },
+
+                reset: function () {
+                    clearTimeout(picker.scanCommitTimer);
+                    picker.dropdown.classList.add('d-none');
+                    picker.scanInput.value = '';
+                    picker.scanInput.classList.add('d-none');
+                    picker.scanHint.classList.add('d-none');
+                    picker.clearWarning();
+                },
+
+                commit: function (value, owner) {
+                    if (activeRfidPicker === picker) {
+                        cancelRegistrationScan();
+                    }
+
+                    const tag = normalizeRfid(value);
+
+                    if (!tag) {
+                        return false;
+                    }
+
+                    // The student being edited already owns their current tag,
+                    // so that tag should not be reported as a duplicate.
+                    const assignedOwner = tag === picker.allowedTag
+                        ? ''
+                        : (owner || assignedRfidOwners[tag]);
+
+                    if (assignedOwner) {
+                        picker.input.value = '';
+                        picker.scanInput.value = '';
+                        picker.scanInput.classList.add('d-none');
+                        picker.scanHint.classList.add('d-none');
+                        picker.showWarning(tag + ' is already assigned to ' + assignedOwner + '.');
+                        window.alert('This rfid is already registered');
+
+                        return false;
+                    }
+
+                    picker.clearWarning();
+                    picker.input.value = tag;
+                    picker.scanInput.value = '';
+                    picker.scanInput.classList.add('d-none');
+                    picker.scanHint.classList.add('d-none');
+                    picker.dropdown.classList.add('d-none');
+
+                    return true;
+                },
+
+                scheduleScanCommit: function (input) {
+                    clearTimeout(picker.scanCommitTimer);
+                    picker.scanCommitTimer = setTimeout(function () {
+                        if (normalizeRfid(input.value)) {
+                            picker.commit(input.value);
+                        }
+                    }, 400);
+                }
+            };
+
+            picker.input.addEventListener('click', picker.openDropdown);
+            picker.input.addEventListener('input', function () {
+                picker.clearWarning();
+                picker.scheduleScanCommit(picker.input);
+            });
+            picker.input.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                event.preventDefault();
+                picker.commit(picker.input.value);
+            });
+            picker.toggle.addEventListener('click', function (event) {
+                event.preventDefault();
+
+                if (picker.dropdown.classList.contains('d-none')) {
+                    picker.openDropdown();
+                } else {
+                    picker.closeDropdown();
+                }
+            });
+            picker.scanBtn.addEventListener('click', function () {
+                activeRfidPicker = picker;
+                picker.clearWarning();
+                picker.scanInput.value = '';
+                picker.scanInput.classList.remove('d-none');
+                picker.scanHint.classList.remove('d-none');
+                picker.scanInput.focus();
+                beginRegistrationScan();
+            });
+            picker.scanInput.addEventListener('input', function () {
+                picker.clearWarning();
+
+                if (activeRfidPicker === picker) {
+                    cancelRegistrationScan();
+                }
+
+                picker.scheduleScanCommit(picker.scanInput);
+            });
+            picker.scanInput.addEventListener('keydown', function (event) {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+
+                event.preventDefault();
+
+                if (activeRfidPicker === picker) {
+                    cancelRegistrationScan();
+                }
+
+                picker.commit(picker.scanInput.value);
+            });
+
+            picker.modal.addEventListener('shown.bs.modal', function () {
+                activeRfidPicker = picker;
+                beginRegistrationScan();
+            });
+            picker.modal.addEventListener('hidden.bs.modal', function () {
+                picker.reset();
+
+                if (activeRfidPicker === picker) {
+                    cancelRegistrationScan();
+                    activeRfidPicker = null;
+                }
+            });
+
+            return picker;
+        }
+
+        const addRfidPicker = createRfidPicker({
+            container: 'add_rfid_picker',
+            modal: 'addModal',
+            input: 'add_rfid_tag',
+            toggle: 'add_rfid_toggle',
+            dropdown: 'add_rfid_dropdown',
+            scanBtn: 'scan_rfid_btn',
+            scanInput: 'scan_rfid_input',
+            scanHint: 'scan_rfid_hint',
+            warning: 'add_rfid_warning'
+        });
+
+        const editRfidPicker = createRfidPicker({
+            container: 'edit_rfid_picker',
+            modal: 'editModal',
+            input: 'edit_rfid_tag',
+            toggle: 'edit_rfid_toggle',
+            dropdown: 'edit_rfid_dropdown',
+            scanBtn: 'edit_scan_rfid_btn',
+            scanInput: 'edit_scan_rfid_input',
+            scanHint: 'edit_scan_rfid_hint',
+            warning: 'edit_rfid_warning'
+        });
+
+        document.addEventListener('click', function (event) {
+            [addRfidPicker, editRfidPicker].forEach(function (picker) {
+                if (!picker.dropdown.classList.contains('d-none') && !picker.container.contains(event.target)) {
+                    picker.closeDropdown();
+                }
+            });
+        });
 
         const SECTIONS_BY_YEAR = {
             '1': ['S1A1', 'S1B1', 'S1C1'],
@@ -812,12 +959,17 @@
             document.getElementById('edit_student_number').value = student.student_number || '';
             enforceStudentNumberFormat(document.getElementById('edit_student_number'));
             document.getElementById('edit_first_name').value = student.first_name || '';
+            enforceNameFormat(document.getElementById('edit_first_name'));
             document.getElementById('edit_last_name').value = student.last_name || '';
+            enforceNameFormat(document.getElementById('edit_last_name'));
             document.getElementById('edit_course').value = student.course || 'BSIT';
             document.getElementById('edit_year_level').value = student.year_level || '';
             populateSectionOptions(editYearLevel, editSection, student.section || '');
             document.getElementById('edit_phone_number').value = student.phone_number || '';
+            enforcePhoneNumberFormat(document.getElementById('edit_phone_number'));
             document.getElementById('edit_rfid_tag').value = student.rfid_tag || '';
+            editRfidPicker.allowedTag = normalizeRfid(student.rfid_tag || '');
+            editRfidPicker.reset();
             document.getElementById('edit_status').value = student.status || 'Enrolled';
             openModal('editModal');
         }
@@ -868,6 +1020,30 @@
                 setTimeout(function () { enforceNameFormat(input); }, 0);
             });
             enforceNameFormat(input);
+        });
+
+        // Live filter: phone numbers accept digits only and stop at 11 digits.
+        // A stored +63 number is converted to its 0-prefixed 11-digit form.
+        function enforcePhoneNumberFormat(input) {
+            let digits = input.value.replace(/\D/g, '');
+
+            if (digits.length > 2 && digits.startsWith('63')) {
+                digits = '0' + digits.slice(2);
+            }
+
+            const formatted = digits.slice(0, 11);
+            if (input.value !== formatted) {
+                input.value = formatted;
+            }
+        }
+
+        document.querySelectorAll('.phone-number-input').forEach(function (input) {
+            input.addEventListener('input', function () {
+                enforcePhoneNumberFormat(input);
+            });
+            input.addEventListener('paste', function () {
+                setTimeout(function () { enforcePhoneNumberFormat(input); }, 0);
+            });
         });
 
         // Validation for Add Form
@@ -955,9 +1131,9 @@
                 document.getElementById('edit_last_error').classList.add('hidden');
             }
 
-            // Validate Phone Number (optional, PH mobile format)
+            // Validate Phone Number (optional, 11-digit PH mobile format)
             const editPhone = document.getElementById('edit_phone_number').value.trim();
-            const phoneRegex = /^(?:\+?63|0)9\d{9}$/;
+            const phoneRegex = /^09\d{9}$/;
             if (editPhone !== '' && !phoneRegex.test(editPhone)) {
                 document.getElementById('edit_phone_error').classList.remove('hidden');
                 valid = false;
