@@ -50,6 +50,7 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
 
     // Reports / exports
+    Route::get('/admin/reports/summary/export', [AdminController::class, 'exportSummaryReport'])->name('admin.reports.summary.export');
     Route::get('/admin/reports/entry-logs/export', [AdminController::class, 'exportEntryLogs'])->name('admin.reports.entry-logs.export');
 });
 

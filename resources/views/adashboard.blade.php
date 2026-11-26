@@ -122,8 +122,8 @@
                 <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-4">
                     <div class="flex flex-wrap justify-between items-start gap-3">
                         <div>
-                            <h2 class="text-lg font-bold text-gray-800">Reports & Exports</h2>
-                            <p class="text-xs text-gray-500 mt-1">Download entry logs as an Excel (.xls) file (optional date range).</p>
+                            <h2 class="text-lg font-bold text-gray-800">Export Entry logs</h2>
+                            <p class="text-xs text-gray-500 mt-1">Download entry logs as an Excel-compatible CSV (.csv) file (optional date range).</p>
                         </div>
                     </div>
                     <form method="GET" action="{{ route('admin.reports.entry-logs.export') }}" class="flex flex-wrap items-end gap-3">
@@ -135,7 +135,17 @@
                             <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">To</label>
                             <input type="date" name="to" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
                         </div>
-                        <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Entry Logs (Excel)</button>
+                        <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Entry Logs (CSV)</button>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-800">Summary Report</h2>
+                        <p class="text-xs text-gray-500 mt-1">Download account, student, RFID, and scan totals with the last 7 days of granted entries.</p>
+                    </div>
+                    <form method="GET" action="{{ route('admin.reports.summary.export') }}">
+                        <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Reports (CSV)</button>
                     </form>
                 </div>
                 </div>

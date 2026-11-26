@@ -26,7 +26,7 @@
 
             @if($userRole === 'SuperAdmin')
                 <div class="px-3 pt-2 pb-2 mt-2 border-t border-green-700">
-                    <p class="text-[10px] font-bold uppercase tracking-widest text-green-200">Admin</p>
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-green-200">Other Dashboards</p>
                 </div>
             @endif
 

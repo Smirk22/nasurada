@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminController extends Controller
@@ -186,46 +187,168 @@ class AdminController extends Controller
 
     public function exportEntryLogs(Request $request): StreamedResponse
     {
-        $from = $request->input('from');
-        $to = $request->input('to');
+        $validated = $request->validate([
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
 
-        $query = EntryLog::query()->with('student')->orderByDesc('date')->orderByDesc('time_in');
+        $from = $validated['from'] ?? null;
+        $to = $validated['to'] ?? null;
 
-        if ($from) {
-            $query->whereDate('date', '>=', $from);
-        }
-        if ($to) {
-            $query->whereDate('date', '<=', $to);
-        }
+        $query = EntryLog::query()
+            ->with(['student', 'visitor'])
+            ->when($from, fn ($query) => $query->whereDate('date', '>=', $from))
+            ->when($to, fn ($query) => $query->whereDate('date', '<=', $to))
+            ->orderByDesc('date')
+            ->orderByDesc('time_in')
+            ->orderByDesc('id');
 
-        $filename = 'entry_logs_'.now()->format('Ymd_His').'.xls';
+        $count = (clone $query)->count();
+        $range = $from || $to
+            ? ' ('.($from ?? 'earliest').' to '.($to ?? 'latest').')'
+            : '';
+
+        ActivityLog::log(
+            'Exported Entry Logs',
+            "Downloaded {$count} entry log(s) as a CSV file{$range}."
+        );
+
+        $filename = 'entry_logs_'.now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($query) {
-            echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
-            echo '<table border="1"><thead><tr>';
-            foreach (['Student No', 'Name', 'Year', 'Section', 'Time In', 'Time Out', 'Status', 'Date', 'Reason for access denied'] as $h) {
-                echo '<th>'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'</th>';
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                throw new RuntimeException('Unable to open the CSV output stream.');
             }
-            echo '</tr></thead><tbody>';
-            $query->chunk(500, function ($logs) {
+
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, [
+                'Student No',
+                'Name',
+                'Year',
+                'Section',
+                'Time In',
+                'Time Out',
+                'Status',
+                'Date',
+                'Reason for access denied',
+            ]);
+
+            $query->chunk(500, function ($logs) use ($handle) {
                 foreach ($logs as $log) {
-                    $s = $log->student;
-                    $name = $s ? trim($s->first_name.' '.($s->middle_name ? $s->middle_name.' ' : '').$s->last_name) : '';
-                    echo '<tr>';
-                    echo '<td>'.htmlspecialchars((string) ($s?->student_number ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars($name, ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($s?->year_level ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($s?->section ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->time_in ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->time_out ?? ''), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) $log->status, ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) $log->date, ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '<td>'.htmlspecialchars((string) ($log->reason ?: 'N/A'), ENT_QUOTES, 'UTF-8').'</td>';
-                    echo '</tr>';
+                    $student = $log->student;
+                    $visitor = $log->visitor;
+
+                    $name = $student
+                        ? trim($student->first_name.' '.$student->last_name)
+                        : (string) ($visitor->visitor_name ?? '');
+
+                    fputcsv($handle, array_map(
+                        fn ($value) => $this->csvValue($value),
+                        [
+                            $student?->student_number,
+                            $name,
+                            $student?->year_level,
+                            $student?->section,
+                            $log->time_in,
+                            $log->time_out,
+                            $log->status,
+                            $log->date,
+                            $log->reason ?: 'N/A',
+                        ]
+                    ));
                 }
             });
-            echo '</tbody></table>';
-        }, $filename, ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8']);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function exportSummaryReport(): StreamedResponse
+    {
+        $generatedAt = now();
+        $studentsWithRfid = Student::whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->count();
+        $todayStatusCounts = [
+            'granted' => EntryLog::whereDate('date', today())->where('status', 'granted')->count(),
+            'denied' => EntryLog::whereDate('date', today())->where('status', 'denied')->count(),
+            'unknown' => EntryLog::whereDate('date', today())->where('status', 'unknown')->count(),
+            'expired' => EntryLog::whereDate('date', today())->where('status', 'expired')->count(),
+        ];
+
+        $rows = [
+            ['Report', 'Generated At', $generatedAt->format('Y-m-d H:i:s')],
+            ['Accounts', 'Total Users', User::count()],
+            ['Accounts', 'Admin Accounts', User::where('role', 'Admin')->count()],
+            ['Accounts', 'Registrar Accounts', User::where('role', 'Registrar')->count()],
+            ['Accounts', 'Security Accounts', User::where('role', 'Security')->count()],
+            ['Students', 'Total Students', Student::count()],
+            ['Students', 'With Registered RFID', $studentsWithRfid],
+            ['Students', 'Without Registered RFID', Student::count() - $studentsWithRfid],
+            ['Scans', 'Valid Scans (all time)', EntryLog::where('status', 'granted')->count()],
+            ['Scans', 'Invalid Scans (all time)', EntryLog::whereIn('status', ['denied', 'unknown', 'expired'])->count()],
+            ['Scans', 'Invalid Scans Today', array_sum($todayStatusCounts) - $todayStatusCounts['granted']],
+        ];
+
+        for ($i = 6; $i >= 0; $i--) {
+            $date = $generatedAt->copy()->subDays($i);
+            $rows[] = [
+                'Last 7 Days',
+                $date->format('M d'),
+                EntryLog::whereDate('date', $date->toDateString())->where('status', 'granted')->count(),
+            ];
+        }
+
+        foreach ($todayStatusCounts as $status => $count) {
+            $rows[] = ['Today Status', ucfirst($status), $count];
+        }
+
+        return $this->streamCsv(
+            'summary_report_'.$generatedAt->format('Ymd_His').'.csv',
+            ['Section', 'Metric', 'Value'],
+            $rows,
+            'Exported Summary Report',
+            'Downloaded the admin summary report as a CSV file.'
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $headers
+     * @param  iterable<array<int, mixed>>  $rows
+     */
+    private function streamCsv(string $filename, array $headers, iterable $rows, string $action, string $details): StreamedResponse
+    {
+        ActivityLog::log($action, $details);
+
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                throw new RuntimeException('Unable to open the CSV output stream.');
+            }
+
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $headers);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, array_map(fn ($value) => $this->csvValue($value), $row));
+            }
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function csvValue(mixed $value): string
+    {
+        $text = (string) ($value ?? '');
+
+        return preg_match('/^\s*[=+\-@]/', $text) ? "'".$text : $text;
     }
 
     /**

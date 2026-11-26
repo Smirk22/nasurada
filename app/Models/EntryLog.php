@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EntryLog extends Model
 {
@@ -20,12 +21,14 @@ class EntryLog extends Model
         'reason',
     ];
 
-    public function student()
+    /** @return BelongsTo<Student, $this> */
+    public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
     }
 
-    public function visitor()
+    /** @return BelongsTo<Visitor, $this> */
+    public function visitor(): BelongsTo
     {
         return $this->belongsTo(Visitor::class);
     }
