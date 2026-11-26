@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visitor Logs - IETI SEVS</title>
+    <title>Temporary Pass Logs - IETI SEVS</title>
 
     {{-- Bootstrap 5 (CDN) --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -81,7 +81,7 @@
             <header class="bg-white shadow-sm px-4 px-lg-5 py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <h1 class="h3 fw-bold text-dark mb-1">
-                        <i class="bi bi-person-badge-fill text-primary me-2"></i>Visitor Logs
+                        <i class="bi bi-person-badge-fill text-primary me-2"></i>Temporary Pass Logs
                     </h1>
                     <p class="text-muted small mb-0">Visitor and temporary-pass scans for {{ today()->format('F j, Y') }}.</p>
                 </div>
@@ -105,7 +105,7 @@
                     <div class="card-header bg-white border-bottom px-3 px-md-4 py-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
                         <div>
                             <h2 class="h5 fw-bold text-dark mb-1">
-                                <i class="bi bi-clock-history text-success me-2"></i>Today's Visitor Logs
+                                <i class="bi bi-clock-history text-success me-2"></i>Today's Temporary Pass Logs
                             </h2>
                             <p class="text-muted small mb-0">Scans recorded from visitor and temporary-pass RFID tags.</p>
                         </div>
@@ -199,7 +199,7 @@
                                     <tr>
                                         <td colspan="6" class="py-5 text-center text-muted">
                                             <i class="bi bi-person-badge fs-3 d-block mb-2"></i>
-                                            No visitor logs yet for today.
+                                            No temporary pass logs yet for today.
                                         </td>
                                     </tr>
                                 @endforelse

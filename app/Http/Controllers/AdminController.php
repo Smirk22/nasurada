@@ -6,7 +6,6 @@ use App\Models\ActivityLog;
 use App\Models\EntryLog;
 use App\Models\Student;
 use App\Models\User;
-use App\Services\BackupService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -19,7 +18,7 @@ class AdminController extends Controller
     /** Roles the Admin dashboard is allowed to see and manage. */
     private const MANAGEABLE_ROLES = ['Registrar', 'Security'];
 
-    public function dashboard(BackupService $backups)
+    public function dashboard(Request $request)
     {
         $totalUsers = User::count();
         $adminCount = User::where('role', 'Admin')->count();
@@ -45,10 +44,23 @@ class AdminController extends Controller
             ->get();
         // The admin monitor covers staff activity only; Super Admin actions
         // stay in the Super Admin audit log.
-        $activities = ActivityLog::query()
-            ->whereRaw('LOWER(role) <> ?', ['superadmin'])
-            ->latest()
-            ->get();
+        $activityQuery = ActivityLog::withoutAccessActions()
+            ->whereRaw("LOWER(COALESCE(role, '')) <> ?", ['superadmin']);
+
+        if ($search = trim((string) $request->input('q', ''))) {
+            $activityQuery->where(function ($query) use ($search) {
+                $query->where('user_name', 'like', "%{$search}%")
+                    ->orWhere('action', 'like', "%{$search}%")
+                    ->orWhere('details', 'like', "%{$search}%");
+            });
+        }
+
+        if ($role = (string) $request->input('role', '')) {
+            $activityQuery->where('role', $role);
+        }
+
+        // Keep the tab anchor and active filters when moving between pages.
+        $activities = $activityQuery->latest()->paginate(10)->withQueryString()->fragment('activity');
 
         // Analytics (last 7 days granted entries per day)
         $analyticsLabels = [];
@@ -65,21 +77,6 @@ class AdminController extends Controller
             'expired' => EntryLog::whereDate('date', today())->where('status', 'expired')->count(),
         ];
 
-        $backupFiles = $backups->all();
-        $backupTotalSize = $backups->totalSizeHuman();
-        $backupDirectory = $backups->directory();
-        $backupKeep = (int) config('backup.keep', 14);
-        $backupIncludesPhotos = (bool) config('backup.include_photos', true);
-        $backupIncludesEnv = (bool) config('backup.include_env', true);
-        $backupDriver = (string) config('database.default');
-        $lastBackup = $backupFiles[0] ?? null;
-        $backupStatus = 'never';
-
-        if ($lastBackup) {
-            $hours = $lastBackup['created_at']->diffInHours(now());
-            $backupStatus = $hours <= 36 ? 'fresh' : 'stale';
-        }
-
         return view('adashboard', compact(
             'totalUsers',
             'adminCount',
@@ -93,14 +90,6 @@ class AdminController extends Controller
             'invalidScans',
             'users',
             'activities',
-            'backupFiles',
-            'backupTotalSize',
-            'backupDirectory',
-            'backupKeep',
-            'backupIncludesPhotos',
-            'backupIncludesEnv',
-            'backupDriver',
-            'backupStatus',
             'analyticsLabels',
             'analyticsData',
             'todayStatusCounts'

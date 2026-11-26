@@ -15,7 +15,6 @@
         <section class="auth-panel">
             <!-- Top dark green header bar with the school logos aligned right -->
             <header class="auth-panel__bar auth-panel__bar--header">
-                <span class="auth-panel__bar-label d-none d-sm-inline">Secure staff portal</span>
                 <div class="auth-panel__logos">
                     <img class="auth-panel__logo" src="{{ asset('images/group-logo.png') }}" alt="Group logo">
                     <img class="auth-panel__logo auth-panel__logo--round" src="{{ asset('images/ietilogo.png') }}" alt="IETI College logo">

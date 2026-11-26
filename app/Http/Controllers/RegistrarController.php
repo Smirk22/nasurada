@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\ActivityLog;
 use App\Models\EntryLog;
 use App\Models\Student;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RegistrarController extends Controller
 {
@@ -32,6 +34,7 @@ class RegistrarController extends Controller
     public function dashboard()
     {
         $totalStudents = Student::count();
+        $sections = collect(self::SECTIONS_BY_YEAR)->flatten()->all();
         $entriesToday = EntryLog::whereDate('date', today())
             ->where('status', 'granted')
             ->count();
@@ -79,6 +82,7 @@ class RegistrarController extends Controller
 
         return view('rdashboard', compact(
             'totalStudents',
+            'sections',
             'entriesToday',
             'sectionBreakdown',
             'entrySummaryToday',
@@ -89,35 +93,7 @@ class RegistrarController extends Controller
 
     public function students(Request $request)
     {
-        $query = Student::query();
-
-        if ($request->filled('search')) {
-            // Match each word against the name/number columns so searches such
-            // as "Juan Cruz" or "MAR-87654321" find the right student.
-            $terms = preg_split('/[^\p{L}\p{N}]+/u', trim((string) $request->input('search')));
-
-            foreach ($terms as $term) {
-                if ($term === '') {
-                    continue;
-                }
-
-                $query->where(function ($q) use ($term) {
-                    $q->where('first_name', 'like', "%{$term}%")
-                        ->orWhere('last_name', 'like', "%{$term}%")
-                        ->orWhere('student_number', 'like', "%{$term}%");
-                });
-            }
-        }
-
-        if ($request->filled('year') && $request->year !== 'All Years') {
-            $query->where('year_level', $request->input('year'));
-        }
-
-        if ($request->filled('section') && $request->section !== 'All Sections') {
-            $query->where('section', $request->input('section'));
-        }
-
-        $students = $query
+        $students = $this->filteredStudents($request)
             ->orderBy('last_name')
             ->orderBy('first_name')
             ->orderBy('id')
@@ -147,6 +123,121 @@ class RegistrarController extends Controller
             'latestStudentNumber',
             'totalStudents'
         ));
+    }
+
+    /**
+     * Download student records as an Excel-compatible file for offline use.
+     */
+    public function exportStudents(Request $request): StreamedResponse
+    {
+        $query = $this->filteredStudents($request)
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->orderBy('id');
+
+        $count = (clone $query)->count();
+
+        ActivityLog::log(
+            'Exported Student Records',
+            "Downloaded {$count} student record(s) as an Excel file."
+        );
+
+        $filename = 'student_records_'.now()->format('Ymd_His').'.xls';
+
+        return response()->streamDownload(function () use ($query) {
+            $escape = static function (string|int|float|null $value): string {
+                return htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
+            };
+
+            echo "\xEF\xBB\xBF"; // UTF-8 BOM for Excel
+            echo '<table border="1"><thead><tr>';
+
+            foreach ([
+                'Student Number',
+                'First Name',
+                'Last Name',
+                'Course',
+                'Year Level',
+                'Section',
+                'Phone Number',
+                'RFID Tag',
+                'Status',
+                'School Year',
+                'Enrollment Confirmed',
+                'Card Type',
+                'Valid Until',
+                'Photo',
+                'Registered',
+                'Updated',
+            ] as $heading) {
+                echo '<th>'.$escape($heading).'</th>';
+            }
+
+            echo '</tr></thead><tbody>';
+
+            $query->chunk(500, function ($students) use ($escape) {
+                foreach ($students as $student) {
+                    echo '<tr>';
+                    echo '<td style="mso-number-format:\@">'.$escape($student->student_number).'</td>';
+                    echo '<td>'.$escape($student->first_name).'</td>';
+                    echo '<td>'.$escape($student->last_name).'</td>';
+                    echo '<td>'.$escape($student->course).'</td>';
+                    echo '<td>'.$escape($student->year_level).'</td>';
+                    echo '<td>'.$escape($student->section).'</td>';
+                    echo '<td style="mso-number-format:\@">'.$escape($student->phone_number).'</td>';
+                    echo '<td style="mso-number-format:\@">'.$escape($student->rfid_tag).'</td>';
+                    echo '<td>'.$escape($student->status).'</td>';
+                    echo '<td>'.$escape($student->school_year).'</td>';
+                    echo '<td>'.$escape($student->enrollment_confirmed ? 'Yes' : 'No').'</td>';
+                    echo '<td>'.$escape($student->card_type).'</td>';
+                    echo '<td>'.$escape($student->valid_until).'</td>';
+                    echo '<td>'.$escape($student->photo).'</td>';
+                    echo '<td>'.$escape($student->created_at?->format('M j, Y g:i A')).'</td>';
+                    echo '<td>'.$escape($student->updated_at?->format('M j, Y g:i A')).'</td>';
+                    echo '</tr>';
+                }
+            });
+
+            echo '</tbody></table>';
+        }, $filename, ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8']);
+    }
+
+    /**
+     * Apply the same search and filter inputs used by the student list.
+     *
+     * @return Builder<Student>
+     */
+    private function filteredStudents(Request $request): Builder
+    {
+        $query = Student::query();
+
+        if ($request->filled('search')) {
+            // Match each word against the name/number columns so searches such
+            // as "Juan Cruz" or "MAR-87654321" find the right student.
+            $terms = preg_split('/[^\p{L}\p{N}]+/u', trim((string) $request->input('search'))) ?: [];
+
+            foreach ($terms as $term) {
+                if ($term === '') {
+                    continue;
+                }
+
+                $query->where(function ($q) use ($term) {
+                    $q->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhere('student_number', 'like', "%{$term}%");
+                });
+            }
+        }
+
+        if ($request->filled('year') && $request->input('year') !== 'All Years') {
+            $query->where('year_level', $request->input('year'));
+        }
+
+        if ($request->filled('section') && $request->input('section') !== 'All Sections') {
+            $query->where('section', $request->input('section'));
+        }
+
+        return $query;
     }
 
     public function store(Request $request)

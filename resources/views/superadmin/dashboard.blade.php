@@ -54,7 +54,7 @@
 
             <!-- Tabs -->
             <div class="flex flex-wrap gap-2 shrink-0">
-                @foreach(['overview' => 'Overview', 'accounts' => 'Accounts', 'activity' => 'Audit Log', 'backups' => 'Backups', 'settings' => 'Settings'] as $key => $label)
+                @foreach(['overview' => 'Overview', 'accounts' => 'Accounts', 'activity' => 'Audit Log', 'access' => 'Access Logs', 'backups' => 'Backups', 'settings' => 'Settings'] as $key => $label)
                     <a href="#{{ $key }}" data-sa-tab="{{ $key }}" class="px-4 py-2 rounded-lg text-sm font-semibold transition bg-white text-gray-600 hover:bg-gray-200 border border-gray-200">
                         {{ $label }}
                     </a>
@@ -250,8 +250,15 @@
                         @endforelse
                     </div>
 
-                    <div>{{ $activities->links() }}</div>
+                    <div class="flex justify-center pt-3 border-t border-gray-100">
+                        {{ $activities->onEachSide(1)->links() }}
+                    </div>
                 </div>
+            </section>
+
+            <!-- Access Logs -->
+            <section id="tab-access" class="hidden flex-col gap-4">
+                @include('partials.access-logs')
             </section>
 
             <!-- Backups -->
@@ -319,7 +326,7 @@
                                             <td class="p-3 font-mono text-xs text-gray-600 break-all">{{ $backup['name'] }}</td>
                                             <td class="p-3 text-gray-600 whitespace-nowrap">{{ $backup['size_human'] }}</td>
                                             <td class="p-3 text-center whitespace-nowrap">
-                                                <a href="{{ route('admin.backups.download', $backup['name']) }}" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Download</a>
+                                                <a href="{{ route('superadmin.backups.download', $backup['name']) }}" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Download</a>
                                                 <button type="button" class="text-ieti-green hover:text-green-800 text-xs font-semibold ml-2" onclick="openBackupAction('saBackupRestoreModal', 'saBackupRestoreForm', {{ json_encode($backup['name']) }}, 'restore')">Restore</button>
                                                 <button type="button" class="text-red-600 hover:text-red-800 text-xs font-semibold ml-2" onclick="openBackupAction('saBackupDeleteModal', 'saBackupDeleteForm', {{ json_encode($backup['name']) }}, 'delete')">Delete</button>
                                             </td>
@@ -340,6 +347,8 @@
                         <p>Restoring replaces the live database; a safety snapshot is saved first and you will be signed out.</p>
                     </div>
                 </div>
+
+                @include('partials.backup-history')
             </section>
 
             <!-- Settings -->
@@ -433,9 +442,9 @@
         <form id="saEditUserForm" method="POST" class="space-y-3">
             @csrf
             @method('PUT')
-            <input type="text" id="sa_edit_name" name="name" required class="w-full border p-2 rounded text-sm">
-            <input type="text" id="sa_edit_username" name="username" required class="w-full border p-2 rounded text-sm">
-            <input type="email" id="sa_edit_email" name="email" required class="w-full border p-2 rounded text-sm">
+            <input type="text" id="sa_edit_name" name="name" placeholder="Full Name" required class="w-full border p-2 rounded text-sm">
+            <input type="text" id="sa_edit_username" name="username" placeholder="Username" required class="w-full border p-2 rounded text-sm">
+            <input type="email" id="sa_edit_email" name="email" placeholder="Email Address" required class="w-full border p-2 rounded text-sm">
             <div>
                 <label class="text-xs text-gray-500 font-semibold">Assign Role</label>
                 <select id="sa_edit_role" name="role" class="w-full border p-2 rounded text-sm mt-1">
@@ -470,7 +479,7 @@
     <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
         <h3 class="text-lg font-bold text-gray-800">Create backup now?</h3>
         <p class="text-sm text-gray-600 mt-2">This creates a ZIP snapshot of the live database and may take a moment.</p>
-        <form action="{{ route('admin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5">
+        <form action="{{ route('superadmin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5">
             @csrf
             <button type="button" onclick="closeSaModal('saBackupCreateModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
             <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Create Backup</button>
@@ -513,7 +522,7 @@
 
 <script>
     // Tab handling (kept in sync with the URL hash)
-    const saTabs = ['overview', 'accounts', 'activity', 'backups', 'settings'];
+    const saTabs = ['overview', 'accounts', 'activity', 'access', 'backups', 'settings'];
 
     function activateSaTab(name) {
         const active = saTabs.includes(name) ? name : 'overview';
@@ -563,10 +572,10 @@
         const name = String(fileName);
         if (action === 'restore') {
             document.getElementById('saBackupRestoreName').textContent = name;
-            document.getElementById(formId).action = '/admin/backups/' + encodeURIComponent(name) + '/restore';
+            document.getElementById(formId).action = '/superadmin/backups/' + encodeURIComponent(name) + '/restore';
         } else {
             document.getElementById('saBackupDeleteName').textContent = name;
-            document.getElementById(formId).action = '/admin/backups/' + encodeURIComponent(name);
+            document.getElementById(formId).action = '/superadmin/backups/' + encodeURIComponent(name);
         }
         openSaModal(modalId);
     }

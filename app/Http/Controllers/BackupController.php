@@ -16,7 +16,7 @@ class BackupController extends Controller
     public function __construct(private readonly BackupService $backups) {}
 
     /**
-     * Create a backup on demand from the admin dashboard.
+     * Create a backup on demand from the Super Admin dashboard.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -28,6 +28,7 @@ class BackupController extends Controller
             $this->backups->pruneSafetySnapshots();
         } catch (Throwable $e) {
             report($e);
+            $this->logBackupFailure('Create backup failed: '.$e->getMessage());
 
             return $this->backToBackups()->withErrors([
                 'backup' => 'Backup failed: '.$e->getMessage(),
@@ -35,7 +36,7 @@ class BackupController extends Controller
         }
 
         ActivityLog::log(
-            'Created Database Backup',
+            ActivityLog::ACTION_CREATED_BACKUP,
             "Created backup '{$backup['name']}' ({$backup['size_human']})"
         );
 
@@ -49,7 +50,7 @@ class BackupController extends Controller
     }
 
     /**
-     * Download a backup archive (admin only).
+     * Download a backup archive (Super Admin only).
      */
     public function download(string $file): BinaryFileResponse
     {
@@ -58,6 +59,11 @@ class BackupController extends Controller
         } catch (Throwable) {
             abort(404);
         }
+
+        ActivityLog::log(
+            ActivityLog::ACTION_DOWNLOADED_BACKUP,
+            "Downloaded backup '{$file}'"
+        );
 
         return response()->download($path, $file, [
             'Content-Type' => 'application/zip',
@@ -83,6 +89,7 @@ class BackupController extends Controller
             Artisan::call('optimize:clear');
         } catch (Throwable $e) {
             report($e);
+            $this->logBackupFailure("Restore backup '{$file}' failed: ".$e->getMessage());
 
             return $this->backToBackups()->withErrors([
                 'backup' => 'Restore failed: '.$e->getMessage(),
@@ -93,7 +100,7 @@ class BackupController extends Controller
 
         try {
             ActivityLog::log(
-                'Restored Database Backup',
+                ActivityLog::ACTION_RESTORED_BACKUP,
                 "Restored backup '{$result['name']}' (safety snapshot: {$result['safety_snapshot']})"
             );
         } catch (Throwable) {
@@ -121,25 +128,32 @@ class BackupController extends Controller
         try {
             $this->backups->delete($file);
         } catch (Throwable $e) {
+            $this->logBackupFailure("Delete backup '{$file}' failed: ".$e->getMessage());
+
             return $this->backToBackups()->withErrors([
                 'backup' => 'Unable to delete backup: '.$e->getMessage(),
             ]);
         }
 
         ActivityLog::log(
-            'Deleted Database Backup',
+            ActivityLog::ACTION_DELETED_BACKUP,
             "Deleted backup '{$file}'"
         );
 
         return $this->backToBackups()->with('success', "Backup {$file} was deleted.");
     }
 
+    private function logBackupFailure(string $details): void
+    {
+        try {
+            ActivityLog::log(ActivityLog::ACTION_FAILED_BACKUP, $details);
+        } catch (Throwable) {
+            // A failed restore may leave the audit schema temporarily unavailable.
+        }
+    }
+
     private function backToBackups(): RedirectResponse
     {
-        $route = auth()->check() && auth()->user()?->role === 'SuperAdmin'
-            ? route('superadmin.dashboard').'#backups'
-            : route('adashboard').'#backups';
-
-        return redirect()->to($route);
+        return redirect()->to(route('superadmin.dashboard').'#backups');
     }
 }

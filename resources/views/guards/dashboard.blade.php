@@ -402,17 +402,17 @@
                     </div>
                 </div>
 
-                <!-- Register Visitor & Alerts -->
+                <!-- Register Temporary Pass -->
                 <div class="row g-3 g-lg-4">
-                    <!-- Register Visitor -->
+                    <!-- Register Temporary Pass -->
                     <div class="col-12 col-lg-6">
                         <div class="card page-card h-100">
                             <div class="card-body p-4">
                                 <h2 class="h5 fw-bold text-dark mb-3">
-                                    <i class="bi bi-person-vcard text-success me-2"></i>Register Visitor
+                                    <i class="bi bi-person-vcard text-success me-2"></i>Register Temporary Pass
                                 </h2>
 
-                                <form id="visitorForm" action="{{ route('guard.visitor.store') }}" method="POST" class="row g-3">
+                                <form id="temporaryPassForm" action="{{ route('guard.temporary-pass.store') }}" method="POST" class="row g-3">
                                     @csrf
 
                                     <!-- Full Name -->
@@ -430,6 +430,7 @@
                                             <option value="drivers_license">Driver's License</option>
                                             <option value="passport">Passport</option>
                                             <option value="national_id">National ID</option>
+                                            <option value="registration_card">Registration Card</option>
                                         </select>
                                     </div>
                                     <div class="col-12 col-md-6">
@@ -446,15 +447,16 @@
                                             <option value="registrar">Registrar</option>
                                             <option value="admin">Administration</option>
                                             <option value="faculty">Faculty</option>
+                                            <option value="loss_of_rfid_id">Loss of RFID/ID</option>
                                         </select>
                                     </div>
 
                                     <!-- Available RFID Tag -->
                                     <div class="col-12 rfid-picker">
-                                        <label class="form-label small fw-semibold text-secondary" for="visitor_rfid_tag">Assign RFID Tag</label>
+                                        <label class="form-label small fw-semibold text-secondary" for="temporary_pass_rfid_tag">Assign RFID Tag</label>
                                         <div class="input-group">
-                                            <input type="text" name="rfid_tag" id="visitor_rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off" required>
-                                            <button type="button" class="btn btn-outline-secondary" id="visitor_rfid_toggle" aria-label="Show RFID scan options">
+                                            <input type="text" name="rfid_tag" id="temporary_pass_rfid_tag" placeholder="Scan an RFID tag or type it here" class="form-control" autocomplete="off" required>
+                                            <button type="button" class="btn btn-outline-secondary" id="temporary_pass_rfid_toggle" aria-label="Show RFID scan options">
                                                 <i class="bi bi-chevron-down"></i>
                                             </button>
                                         </div>
@@ -473,7 +475,7 @@
                                     <!-- Buttons -->
                                     <div class="col-12 d-flex gap-2 pt-1">
                                         <button type="submit" class="btn btn-ieti fw-semibold flex-fill">
-                                            <i class="bi bi-check2-circle me-1"></i>Issue Visitor Pass
+                                            <i class="bi bi-check2-circle me-1"></i>Issue Temporary Pass
                                         </button>
                                         <button type="reset" class="btn btn-outline-secondary fw-semibold flex-fill">
                                             Clear
@@ -606,9 +608,9 @@
 
     <!-- Visitor RFID Picker -->
     <script>
-        const visitorForm = document.getElementById('visitorForm');
-        const visitorRfidInput = document.getElementById('visitor_rfid_tag');
-        const visitorRfidToggle = document.getElementById('visitor_rfid_toggle');
+        const visitorForm = document.getElementById('temporaryPassForm');
+        const visitorRfidInput = document.getElementById('temporary_pass_rfid_tag');
+        const visitorRfidToggle = document.getElementById('temporary_pass_rfid_toggle');
         const visitorRfidDropdown = document.getElementById('visitor_rfid_dropdown');
         const scanVisitorRfidBtn = document.getElementById('scan_visitor_rfid_btn');
         const scanVisitorRfidInput = document.getElementById('scan_visitor_rfid_input');

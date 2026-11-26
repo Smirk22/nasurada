@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -55,6 +56,8 @@ class AuthController extends Controller
 
         if ($user) {
             if ($user->must_reset_password) {
+                $this->logFailedLogin($request, $user, 'Account locked; password reset required.');
+
                 return $this->lockoutRedirect(
                     $request,
                     $user,
@@ -63,6 +66,8 @@ class AuthController extends Controller
             }
 
             if ($user->locked_until && $user->locked_until->isFuture()) {
+                $this->logFailedLogin($request, $user, $this->lockoutMessage($user->locked_until));
+
                 return $this->lockoutRedirect(
                     $request,
                     $user,
@@ -83,11 +88,14 @@ class AuthController extends Controller
 
                 if ($user->must_reset_password) {
                     $message = 'Too many failed attempts. This account is locked. Please contact the system administrator to reset your password.';
+                    $this->logFailedLogin($request, $user, 'Account locked after repeated failed attempts.');
 
                     return $this->lockoutRedirect($request, $user, $message);
                 }
 
                 if ($user->locked_until && $user->locked_until->isFuture()) {
+                    $this->logFailedLogin($request, $user, $this->lockoutMessage($user->locked_until));
+
                     return $this->lockoutRedirect(
                         $request,
                         $user,
@@ -95,6 +103,8 @@ class AuthController extends Controller
                     );
                 }
             }
+
+            $this->logFailedLogin($request, $user, $message);
 
             return back()->withErrors([
                 'email' => $message,
@@ -232,6 +242,16 @@ class AuthController extends Controller
         $request->session()->put('login.captcha', $a + $b);
 
         return [$a, $b];
+    }
+
+    private function logFailedLogin(Request $request, ?User $user, string $reason): void
+    {
+        ActivityLog::record(
+            $user->username ?? (string) $request->input('email', 'Unknown'),
+            $user->role ?? 'Unknown',
+            ActivityLog::ACTION_FAILED_LOGIN,
+            $reason.' IP: '.$request->ip().'.'
+        );
     }
 
     private function registerFailedLoginAttempt(User $user): void

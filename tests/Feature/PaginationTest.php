@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
 use App\Models\EntryLog;
 use App\Models\Student;
 use App\Models\User;
@@ -149,5 +150,50 @@ class PaginationTest extends TestCase
         $secondPage->assertOk()
             ->assertJsonPath('current_page', 2)
             ->assertJsonCount(5, 'data');
+    }
+
+    public function test_superadmin_audit_log_is_paginated_and_keeps_filters_and_tab(): void
+    {
+        for ($i = 1; $i <= 22; $i++) {
+            ActivityLog::create([
+                'user_name' => 'Audit User '.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+                'role' => 'Admin',
+                'action' => 'Audited',
+                'details' => 'Entry '.$i,
+            ]);
+        }
+
+        $superAdmin = User::create([
+            'name' => 'Super Admin',
+            'username' => 'superadmin-pagination',
+            'email' => 'superadmin-pagination@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'SuperAdmin',
+        ]);
+
+        $firstPage = $this->actingAs($superAdmin)
+            ->get(route('superadmin.dashboard', ['q' => 'Audit User']));
+
+        $firstPage->assertOk()
+            ->assertSee('page=2', false);
+
+        $paginator = $firstPage->viewData('activities');
+
+        $this->assertSame(22, $paginator->total());
+        $this->assertSame(10, $paginator->perPage());
+        $this->assertCount(10, $paginator->items());
+        $this->assertStringContainsString('q=', $paginator->url(2));
+        $this->assertStringContainsString('page=2', $paginator->url(2));
+        $this->assertStringEndsWith('#activity', $paginator->url(2));
+
+        $secondPage = $this->get(route('superadmin.dashboard', ['q' => 'Audit User', 'page' => 2]));
+
+        $secondPage->assertOk();
+        $this->assertCount(10, $secondPage->viewData('activities')->items());
+
+        $thirdPage = $this->get(route('superadmin.dashboard', ['q' => 'Audit User', 'page' => 3]));
+
+        $thirdPage->assertOk();
+        $this->assertCount(2, $thirdPage->viewData('activities')->items());
     }
 }

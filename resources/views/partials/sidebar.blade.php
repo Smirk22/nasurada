@@ -1,5 +1,6 @@
 @php($userRole = auth()->user()->role)
 @php($isAdminLike = in_array($userRole, ['Admin', 'SuperAdmin'], true))
+@php($onAdminDashboard = request()->routeIs('adashboard'))
 
 <aside class="w-64 bg-ieti-green text-white min-h-screen flex flex-col shadow-lg">
     <!-- Logo Section -->
@@ -22,36 +23,62 @@
                     <span class="text-sm font-semibold">Control Center</span>
                 </a>
             @endif
+
+            @if($userRole === 'SuperAdmin')
+                <div class="px-3 pt-2 pb-2 mt-2 border-t border-green-700">
+                    <p class="text-[10px] font-bold uppercase tracking-widest text-green-200">Admin</p>
+                </div>
+            @endif
+
             <a href="{{ route('adashboard') }}" data-admin-tab="overview" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 21h6a2 2 0 002-2V9l-7-4-7 4v12a2 2 0 002 2z"></path>
                 </svg>
                 <span class="text-sm font-medium">Admin Dashboard</span>
             </a>
-            <a href="{{ route('adashboard') }}#backups" data-admin-tab="backups" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
-                </svg>
-                <span class="text-sm font-medium">Database Backups</span>
-            </a>
-            <a href="{{ route('adashboard') }}#reports" data-admin-tab="reports" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-                <span class="text-sm font-medium">Reports & Exports</span>
-            </a>
-            <a href="{{ route('adashboard') }}#users" data-admin-tab="users" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                </svg>
-                <span class="text-sm font-medium">User Management</span>
-            </a>
+
+            @if($onAdminDashboard)
+                <a href="{{ route('adashboard') }}#activity" data-admin-tab="activity" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h4l3-8 4 16 3-8h4"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Activity Monitor</span>
+                </a>
+                <a href="{{ route('adashboard') }}#reports" data-admin-tab="reports" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Reports & Exports</span>
+                </a>
+                <a href="{{ route('adashboard') }}#users" data-admin-tab="users" class="admin-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">User Management</span>
+                </a>
+            @endif
             <a href="/rdashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('rdashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 21h6a2 2 0 002-2V9l-7-4-7 4v12a2 2 0 002 2z"></path>
                 </svg>
                 <span class="text-sm font-medium">Registrar Dashboard</span>
             </a>
+
+            @if($isAdminLike && (request()->is('rdashboard') || request()->path() === 'registrar/students' || request()->path() === 'registrar/entry-logs'))
+                <a href="/registrar/students" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/students' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM5 20h10v-2a7 7 0 00-10 0v2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Student Records</span>
+                </a>
+                <a href="/registrar/entry-logs" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/entry-logs' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Entry Logs</span>
+                </a>
+            @endif
+
             <a href="/Security/dashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('Security/dashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
@@ -59,7 +86,7 @@
                 <span class="text-sm font-medium">Guard Dashboard</span>
             </a>
         @elseif(auth()->user()->role === 'Registrar')
-            <a href="/rdashboard" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('rdashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
+            <a href="{{ route('rdashboard') }}" data-registrar-tab-link="overview" class="registrar-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('rdashboard') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M9 21h6a2 2 0 002-2V9l-7-4-7 4v12a2 2 0 002 2z"></path>
                 </svg>
@@ -97,13 +124,13 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                 </svg>
-                <span class="text-sm font-medium">Visitor's List</span>
+                <span class="text-sm font-medium">Temporary Pass List</span>
             </a>
             <a href="{{ route('guard.visitor-logs.index') }}" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->is('Security/visitor-logs') ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <span class="text-sm font-medium">Visitor's Logs</span>
+                <span class="text-sm font-medium">Temporary Pass Logs</span>
             </a>
         @endif
 
@@ -114,27 +141,18 @@
                 </svg>
                 <span class="text-sm font-medium">Student Records</span>
             </a>
+            <a href="{{ route('rdashboard') }}#export-records" data-registrar-tab-link="export" class="registrar-tab-link flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-green-700 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path>
+                </svg>
+                <span class="text-sm font-medium">Export Records</span>
+            </a>
             <a href="/registrar/entry-logs" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/entry-logs' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
                 <span class="text-sm font-medium">Entry Logs</span>
             </a>
-        @elseif($isAdminLike)
-            @if(request()->is('rdashboard') || request()->path() === 'registrar/students' || request()->path() === 'registrar/entry-logs')
-                <a href="/registrar/students" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/students' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM5 20h10v-2a7 7 0 00-10 0v2z"></path>
-                    </svg>
-                    <span class="text-sm font-medium">Student Records</span>
-                </a>
-                <a href="/registrar/entry-logs" class="flex items-center space-x-3 px-4 py-3 rounded-lg {{ request()->path() === 'registrar/entry-logs' ? 'bg-green-700' : 'hover:bg-green-700 transition' }}">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="text-sm font-medium">Entry Logs</span>
-                </a>
-            @endif
         @endif
     </nav>
 

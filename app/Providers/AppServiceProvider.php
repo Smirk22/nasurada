@@ -2,10 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\ActivityLog;
 use App\Models\Setting;
+use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -28,6 +33,30 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureApplicationSettings();
+        $this->logAccessEvents();
+    }
+
+    /**
+     * Record sign-in and sign-out activity for the Admin and Super Admin
+     * access logs. Using auth events also covers Fortify's logout route.
+     */
+    protected function logAccessEvents(): void
+    {
+        Event::listen(Login::class, function (Login $event): void {
+            ActivityLog::logAs(
+                $event->user instanceof User ? $event->user : null,
+                ActivityLog::ACTION_LOGGED_IN,
+                'Signed in via '.$event->guard.' from '.request()->ip().'.'
+            );
+        });
+
+        Event::listen(Logout::class, function (Logout $event): void {
+            ActivityLog::logAs(
+                $event->user instanceof User ? $event->user : null,
+                ActivityLog::ACTION_LOGGED_OUT,
+                'Signed out via '.$event->guard.' from '.request()->ip().'.'
+            );
+        });
     }
 
     /**

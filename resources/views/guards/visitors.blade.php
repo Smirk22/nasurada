@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visitor's List - IETI SEVS</title>
+    <title>Temporary Pass List - IETI SEVS</title>
 
     {{-- Bootstrap 5 (CDN) --}}
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -90,7 +90,7 @@
             <header class="bg-white shadow-sm px-4 px-lg-5 py-3 border-bottom d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <h1 class="h3 fw-bold text-dark mb-1">
-                        <i class="bi bi-person-vcard text-success me-2"></i>Visitor's List
+                        <i class="bi bi-person-vcard text-success me-2"></i>Temporary Pass List
                     </h1>
                     <p class="text-muted small mb-0">Registered visitors and the RFID tags assigned to them.</p>
                 </div>
@@ -206,11 +206,16 @@
                                                 'drivers_license' => "Driver's License",
                                                 'passport' => 'Passport',
                                                 'national_id' => 'National ID',
+                                                'registration_card' => 'Registration Card',
                                                 default => ucfirst(str_replace('_', ' ', $visitor->id_type)),
                                             } }}
                                         </td>
                                         <td class="text-muted">{{ $visitor->id_number }}</td>
-                                        <td class="text-muted">{{ ucfirst($visitor->visiting_department) }}</td>
+                                        <td class="text-muted">
+                                            {{ $visitor->visiting_department === 'loss_of_rfid_id'
+                                                ? 'Loss of RFID/ID'
+                                                : ucfirst(str_replace('_', ' ', $visitor->visiting_department)) }}
+                                        </td>
                                         <td>
                                             <span class="badge text-bg-light border rfid-code">{{ $visitor->rfid_tag }}</span>
                                         </td>
@@ -220,7 +225,7 @@
                                         <td class="pe-4 text-end">
                                             <form action="{{ route('guard.visitors.destroy', $visitor) }}" method="POST"
                                                   class="d-inline"
-                                                  onsubmit="return confirm('Remove this visitor from the Visitor\'s List? Their RFID tag will be released and treated as unregistered until it is assigned again.');">
+                                                  onsubmit="return confirm('Remove this pass from the Temporary Pass List? Their RFID tag will be released and treated as unregistered until it is assigned again.');">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">

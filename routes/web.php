@@ -49,18 +49,6 @@ Route::middleware(['auth', 'role:Admin'])->group(function () {
     Route::post('/admin/users/{user}/temporary-password', [AdminController::class, 'generateTemporaryPassword'])->name('admin.users.temporary-password');
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser'])->name('admin.users.destroy');
 
-    // Database backups
-    Route::post('/admin/backups', [BackupController::class, 'store'])->name('admin.backups.store');
-    Route::get('/admin/backups/{file}', [BackupController::class, 'download'])
-        ->where('file', '[A-Za-z0-9._-]+')
-        ->name('admin.backups.download');
-    Route::post('/admin/backups/{file}/restore', [BackupController::class, 'restore'])
-        ->where('file', '[A-Za-z0-9._-]+')
-        ->name('admin.backups.restore');
-    Route::delete('/admin/backups/{file}', [BackupController::class, 'destroy'])
-        ->where('file', '[A-Za-z0-9._-]+')
-        ->name('admin.backups.destroy');
-
     // Reports / exports
     Route::get('/admin/reports/entry-logs/export', [AdminController::class, 'exportEntryLogs'])->name('admin.reports.entry-logs.export');
 });
@@ -74,6 +62,18 @@ Route::middleware(['auth', 'role:SuperAdmin'])->prefix('superadmin')->name('supe
     Route::post('/users/{user}/temporary-password', [SuperAdminController::class, 'generateTemporaryPassword'])->name('users.temporary-password');
     Route::delete('/users/{user}', [SuperAdminController::class, 'destroyUser'])->name('users.destroy');
 
+    // Database backups (Super Admin only)
+    Route::post('/backups', [BackupController::class, 'store'])->name('backups.store');
+    Route::get('/backups/{file}', [BackupController::class, 'download'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('backups.download');
+    Route::post('/backups/{file}/restore', [BackupController::class, 'restore'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('backups.restore');
+    Route::delete('/backups/{file}', [BackupController::class, 'destroy'])
+        ->where('file', '[A-Za-z0-9._-]+')
+        ->name('backups.destroy');
+
     Route::put('/settings', [SuperAdminController::class, 'updateSettings'])->name('settings.update');
 });
 
@@ -81,6 +81,7 @@ Route::middleware(['auth', 'role:SuperAdmin'])->prefix('superadmin')->name('supe
 Route::middleware(['auth', 'role:SuperAdmin,Admin,Registrar'])->group(function () {
     Route::get('/rdashboard', [RegistrarController::class, 'dashboard'])->name('rdashboard');
     Route::get('/registrar/students', [RegistrarController::class, 'students'])->name('registrar.students');
+    Route::get('/registrar/students/export', [RegistrarController::class, 'exportStudents'])->name('registrar.students.export');
     Route::post('/registrar/students', [RegistrarController::class, 'store'])->name('registrar.students.store');
     Route::put('/registrar/students/{student}', [RegistrarController::class, 'update'])->name('registrar.students.update');
     Route::post('/registrar/students/{student}/photo', [RegistrarController::class, 'updatePhoto'])->name('registrar.students.photo');
@@ -106,6 +107,7 @@ Route::middleware(['auth', 'role:Admin,Registrar,Security'])->group(function () 
 Route::middleware(['auth', 'role:Admin,Security'])->prefix('Security')->group(function () {
     Route::get('/dashboard', [GuardController::class, 'dashboard'])->name('guard.dashboard');
     Route::post('/visitor', [GuardController::class, 'visitorStore'])->name('guard.visitor.store');
+    Route::post('/temporary-pass', [GuardController::class, 'visitorStore'])->name('guard.temporary-pass.store');
     Route::get('/visitors', [GuardController::class, 'visitors'])->name('guard.visitors.index');
     Route::get('/visitor-logs', [GuardController::class, 'visitorLogs'])->name('guard.visitor-logs.index');
     Route::delete('/visitors/{visitor}', [GuardController::class, 'visitorDestroy'])->name('guard.visitors.destroy');

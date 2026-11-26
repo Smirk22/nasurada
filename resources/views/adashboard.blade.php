@@ -38,7 +38,7 @@
                     </div>
                 @endif
 
-                @if($errors->any() && ! $errors->has('backup'))
+                @if($errors->any())
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl shadow-sm shrink-0">
                         {{ $errors->first() }}
                     </div>
@@ -116,170 +116,6 @@
                     </div>
                 </div>
 
-                <!-- Live Staff Activity Feed -->
-                <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col gap-3">
-                    <div class="flex justify-between items-center shrink-0">
-                        <div>
-                            <h2 class="text-lg font-bold text-gray-800">Live Activity Monitor</h2>
-                            <p class="text-xs text-gray-500">Real-time audit log of Registrar & Security actions.</p>
-                        </div>
-                        <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
-                            {{ $activities->count() }} Total Logs
-                        </span>
-                    </div>
-
-                    <!-- Scrollable log container -->
-                    <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto pr-2 inner-scroll">
-                        @forelse($activities as $act)
-                            <div class="py-3 flex justify-between items-center text-sm">
-                                <div class="flex items-center space-x-3">
-                                    <span class="font-bold text-xs px-2.5 py-1 rounded-md
-                                        {{ strtolower($act->role) === 'admin' ? 'bg-purple-100 text-purple-800' : (strtolower($act->role) === 'registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">
-                                        {{ $act->role }}
-                                    </span>
-                                    <div>
-                                        <p class="font-semibold text-gray-800">{{ $act->user_name }} &mdash; <span class="font-normal text-gray-600">{{ $act->action }}</span></p>
-                                        <p class="text-xs text-gray-500">{{ $act->details }}</p>
-                                    </div>
-                                </div>
-                                <span class="text-xs text-gray-400 font-mono whitespace-nowrap ml-4">{{ $act->created_at->diffForHumans() }}</span>
-                            </div>
-                        @empty
-                            <p class="text-xs text-gray-400 py-6 text-center">No recent staff activity logged.</p>
-                        @endforelse
-                    </div>
-                </div>
-                </div>
-
-                <!-- Backups tab -->
-                <div id="admin-tab-backups" class="hidden flex flex-col gap-4">
-                <!-- Database Backups -->
-                <div id="backups" class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col shrink-0 gap-4">
-                    @php($lastBackup = $backupFiles[0] ?? null)
-
-                    <div class="flex flex-wrap justify-between items-start gap-3">
-                        <div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="text-lg font-bold text-gray-800">Database Backups</h2>
-                                @if (($backupStatus ?? 'never') === 'fresh')
-                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-green-100 text-green-800">Up to date</span>
-                                @elseif (($backupStatus ?? 'never') === 'stale')
-                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-orange-100 text-orange-800">Backup overdue</span>
-                                @else
-                                    <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-red-100 text-red-800">No backup yet</span>
-                                @endif
-                            </div>
-                            <p class="text-xs text-gray-500 mt-1">
-                                ZIP snapshots of the SQLite database
-                                @if (!empty($backupIncludesPhotos)), student photos @endif
-                                @if (!empty($backupIncludesEnv)), and .env @endif.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onclick="openBackupCreateModal()"
-                            class="bg-ieti-green hover:bg-green-800 text-white font-semibold px-4 py-2 rounded-lg text-sm transition"
-                        >
-                            + Backup Now
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                            <p class="text-[11px] font-semibold uppercase text-gray-500">Last Backup</p>
-                            <p class="mt-1 text-sm font-bold text-gray-800">
-                                {{ $lastBackup ? $lastBackup['created_at']->diffForHumans() : 'Never' }}
-                            </p>
-                            <p class="text-[11px] text-gray-500">
-                                {{ $lastBackup ? $lastBackup['created_at']->format('M j, Y g:i A') : 'Create your first backup' }}
-                            </p>
-                        </div>
-                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                            <p class="text-[11px] font-semibold uppercase text-gray-500">Storage Used</p>
-                            <p class="mt-1 text-sm font-bold text-gray-800">{{ $backupTotalSize }}</p>
-                            <p class="text-[11px] text-gray-500">{{ count($backupFiles) }} archive(s) saved</p>
-                        </div>
-                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                            <p class="text-[11px] font-semibold uppercase text-gray-500">Retention</p>
-                            <p class="mt-1 text-sm font-bold text-gray-800">Keep {{ $backupKeep ?? (int) config('backup.keep', 14) }} newest</p>
-                            <p class="text-[11px] text-gray-500">Older archives are pruned automatically</p>
-                        </div>
-                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-3">
-                            <p class="text-[11px] font-semibold uppercase text-gray-500">Database</p>
-                            <p class="mt-1 text-sm font-bold text-gray-800 uppercase">{{ $backupDriver ?? config('database.default') }}</p>
-                            <p class="text-[11px] text-gray-500">Automatic backups support SQLite</p>
-                        </div>
-                    </div>
-
-                    @if ($errors->has('backup'))
-                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl text-sm">
-                            {{ $errors->first('backup') }}
-                        </div>
-                    @endif
-
-                    @if(count($backupFiles))
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-gray-50">
-                                    <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
-                                        <th class="p-3">Created</th>
-                                        <th class="p-3">File</th>
-                                        <th class="p-3">Size</th>
-                                        <th class="p-3 text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 text-sm">
-                                    @foreach($backupFiles as $backup)
-                                        <tr class="hover:bg-gray-50 transition">
-                                            <td class="p-3 text-gray-700 whitespace-nowrap">
-                                                <div>{{ $backup['created_at']->format('M j, Y g:i A') }}</div>
-                                                <div class="text-[11px] text-gray-400">{{ $backup['created_at']->diffForHumans() }}</div>
-                                            </td>
-                                            <td class="p-3 font-mono text-xs text-gray-600 break-all">{{ $backup['name'] }}</td>
-                                            <td class="p-3 text-gray-600 whitespace-nowrap">{{ $backup['size_human'] }}</td>
-                                            <td class="p-3 text-center whitespace-nowrap">
-                                                <div class="inline-flex items-center gap-2">
-                                                    <a href="{{ route('admin.backups.download', $backup['name']) }}" class="text-blue-600 hover:text-blue-800 text-xs font-semibold">Download</a>
-                                                    <button
-                                                        type="button"
-                                                        class="text-ieti-green hover:text-green-800 text-xs font-semibold"
-                                                        onclick="openBackupRestoreModal({{ json_encode($backup['name']) }})"
-                                                    >Restore</button>
-                                                    <button
-                                                        type="button"
-                                                        class="text-red-600 hover:text-red-800 text-xs font-semibold"
-                                                        onclick="openBackupDeleteModal({{ json_encode($backup['name']) }})"
-                                                    >Delete</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <div class="text-center border border-dashed border-gray-200 rounded-xl py-8 px-4">
-                            <p class="text-sm font-semibold text-gray-700">No backups yet</p>
-                            <p class="text-xs text-gray-400 mt-1">Create a snapshot before making major changes or at the end of each school day.</p>
-                            <button type="button" onclick="openBackupCreateModal()" class="mt-3 text-xs font-semibold text-ieti-green hover:underline">
-                                Create first backup
-                            </button>
-                        </div>
-                    @endif
-
-                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
-                        <p>
-                            Backups are stored on this computer only, in
-                            <code class="font-mono">{{ $backupDirectory }}</code>.
-                            Download copies regularly to an external drive or cloud folder.
-                        </p>
-                        <p>
-                            Restore from this panel replaces the live database (a safety snapshot is saved first).
-                            For a daily 11:00 PM backup, run <code class="font-mono">install-backup-task.bat</code> once
-                            or keep <code class="font-mono">php artisan schedule:work</code> running.
-                        </p>
-                    </div>
-                </div>
                 </div>
 
                 <div id="admin-tab-reports" class="hidden flex flex-col gap-4">
@@ -302,6 +138,64 @@
                         <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Entry Logs (Excel)</button>
                     </form>
                 </div>
+                </div>
+
+                <div id="admin-tab-activity" class="hidden flex flex-col gap-4">
+                    <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-col gap-3">
+                        <div class="flex flex-wrap justify-between items-start gap-3">
+                            <div>
+                                <h2 class="text-lg font-bold text-gray-800">Activity Monitor</h2>
+                                <p class="text-xs text-gray-500">Search and filter staff activity recorded across the dashboards.</p>
+                            </div>
+                            <span class="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
+                                {{ $activities->total() }} Total Logs
+                            </span>
+                        </div>
+
+                        <form method="GET" action="{{ route('adashboard') }}#activity" class="flex flex-wrap items-end gap-3">
+                            <div class="flex-1 min-w-[200px]">
+                                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Search</label>
+                                <input type="text" name="q" value="{{ request('q') }}" placeholder="User, action or details" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Role</label>
+                                <select name="role" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">All roles</option>
+                                    @foreach(['Admin', 'Registrar', 'Security'] as $role)
+                                        <option value="{{ $role }}" {{ request('role') === $role ? 'selected' : '' }}>{{ $role }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Filter</button>
+                            @if(request('q') || request('role'))
+                                <a href="{{ route('adashboard') }}#activity" class="px-4 py-2 text-sm text-gray-500 hover:underline">Clear</a>
+                            @endif
+                        </form>
+
+                        <div class="divide-y divide-gray-100 max-h-[32rem] overflow-y-auto pr-2 inner-scroll">
+                            @forelse($activities as $act)
+                                <div class="py-3 flex justify-between items-center text-sm">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="font-bold text-xs px-2.5 py-1 rounded-md
+                                            {{ strtolower($act->role) === 'admin' ? 'bg-purple-100 text-purple-800' : (strtolower($act->role) === 'registrar' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800') }}">
+                                            {{ $act->role }}
+                                        </span>
+                                        <div>
+                                            <p class="font-semibold text-gray-800">{{ $act->user_name }} &mdash; <span class="font-normal text-gray-600">{{ $act->action }}</span></p>
+                                            <p class="text-xs text-gray-500">{{ $act->details }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400 font-mono whitespace-nowrap ml-4">{{ $act->created_at->diffForHumans() }}</span>
+                                </div>
+                            @empty
+                                <p class="text-xs text-gray-400 py-6 text-center">No activity matches these filters.</p>
+                            @endforelse
+                        </div>
+
+                        <div class="flex justify-center pt-3 border-t border-gray-100">
+                            {{ $activities->onEachSide(1)->links() }}
+                        </div>
+                    </div>
                 </div>
 
                 <div id="admin-tab-users" class="hidden flex flex-col gap-4">
@@ -415,9 +309,9 @@
             <form id="editUserForm" method="POST" class="space-y-3">
                 @csrf
                 @method('PUT')
-                <input type="text" id="edit_user_name" name="name" required class="w-full border p-2 rounded text-sm">
-                <input type="text" id="edit_user_username" name="username" required class="w-full border p-2 rounded text-sm">
-                <input type="email" id="edit_user_email" name="email" required class="w-full border p-2 rounded text-sm">
+                <input type="text" id="edit_user_name" name="name" placeholder="Full Name" required class="w-full border p-2 rounded text-sm">
+                <input type="text" id="edit_user_username" name="username" placeholder="Username" required class="w-full border p-2 rounded text-sm">
+                <input type="email" id="edit_user_email" name="email" placeholder="Email Address" required class="w-full border p-2 rounded text-sm">
                 <p id="edit_user_lock_hint" class="hidden text-xs text-red-600 font-semibold">This account is locked. Use the key icon in the Temp Password column to generate a temporary password and unlock login.</p>
                 <div>
                     <label class="text-xs text-gray-500 font-semibold">Assign Role</label>
@@ -429,72 +323,6 @@
                 <div class="flex justify-end space-x-2 mt-4">
                     <button type="button" onclick="closeModal('editUserModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
                     <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Update User</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Backup Create Confirm Modal -->
-    <div id="backupCreateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-lg font-bold text-gray-800">Create backup now?</h3>
-            <p class="text-sm text-gray-600 mt-2">
-                This will create a ZIP snapshot of the live database
-                @if (!empty($backupIncludesPhotos)), student photos @endif
-                @if (!empty($backupIncludesEnv)), and .env @endif.
-                It may take a moment.
-            </p>
-            <form id="backupCreateForm" action="{{ route('admin.backups.store') }}" method="POST" class="flex justify-end gap-2 mt-5" onsubmit="return lockBackupSubmit(this, 'Creatingâ€¦')">
-                @csrf
-                <button type="button" onclick="closeModal('backupCreateModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Create Backup</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Backup Delete Confirm Modal -->
-    <div id="backupDeleteModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-lg font-bold text-gray-800">Delete this backup?</h3>
-            <p class="text-sm text-gray-600 mt-2">
-                <code id="backupDeleteName" class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"></code>
-                will be permanently removed. This cannot be undone.
-            </p>
-            <form id="backupDeleteForm" method="POST" class="flex justify-end gap-2 mt-5">
-                @csrf
-                @method('DELETE')
-                <button type="button" onclick="closeModal('backupDeleteModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Delete Backup</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Backup Restore Confirm Modal -->
-    <div id="backupRestoreModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <h3 class="text-lg font-bold text-gray-800">Restore from backup?</h3>
-            <p class="text-sm text-gray-600 mt-2">
-                This replaces the live database with
-                <code id="backupRestoreName" class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded"></code>.
-                A safety snapshot of the current database is saved first. You will be signed out after restore.
-            </p>
-            <form id="backupRestoreForm" method="POST" class="space-y-3 mt-4" onsubmit="return lockBackupSubmit(this, 'Restoringâ€¦')">
-                @csrf
-                <div>
-                    <label for="backupRestoreConfirmation" class="text-xs font-semibold text-gray-600">Type <span class="font-mono">RESTORE</span> to confirm</label>
-                    <input
-                        type="text"
-                        id="backupRestoreConfirmation"
-                        name="confirmation"
-                        required
-                        autocomplete="off"
-                        class="mt-1 w-full border p-2 rounded text-sm font-mono"
-                        placeholder="RESTORE"
-                    >
-                </div>
-                <div class="flex justify-end gap-2">
-                    <button type="button" onclick="closeModal('backupRestoreModal')" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">Cancel</button>
-                    <button type="submit" class="px-4 py-2 text-sm bg-ieti-green text-white rounded-lg font-semibold">Restore System</button>
                 </div>
             </form>
         </div>
@@ -531,31 +359,6 @@
     <script>
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function lockBackupSubmit(form, label) {
-            const button = form.querySelector('button[type="submit"]');
-            if (button) {
-                button.disabled = true;
-                button.textContent = label || 'Please waitâ€¦';
-            }
-            return true;
-        }
-        function openBackupCreateModal() {
-            openModal('backupCreateModal');
-        }
-        function openBackupDeleteModal(fileName) {
-            document.getElementById('backupDeleteName').textContent = fileName;
-            document.getElementById('backupDeleteForm').action = '/admin/backups/' + encodeURIComponent(fileName);
-            openModal('backupDeleteModal');
-        }
-        function openBackupRestoreModal(fileName) {
-            document.getElementById('backupRestoreName').textContent = fileName;
-            document.getElementById('backupRestoreForm').action = '/admin/backups/' + encodeURIComponent(fileName) + '/restore';
-            document.getElementById('backupRestoreConfirmation').value = '';
-            openModal('backupRestoreModal');
-            setTimeout(function () {
-                document.getElementById('backupRestoreConfirmation').focus();
-            }, 50);
-        }
         function markTempPasswordCopied(button) {
             const original = button.getAttribute('data-original-label') || button.textContent.trim() || 'Copy';
             button.setAttribute('data-original-label', original);
@@ -667,26 +470,26 @@
 
         function setAdminTab(tab) {
             const overview = document.getElementById('admin-tab-overview');
-            const backups = document.getElementById('admin-tab-backups');
             const reports = document.getElementById('admin-tab-reports');
+            const activity = document.getElementById('admin-tab-activity');
             const users = document.getElementById('admin-tab-users');
             const title = document.getElementById('adminPageTitle');
             const subtitle = document.getElementById('adminPageSubtitle');
 
             if (overview) overview.classList.toggle('hidden', tab !== 'overview');
-            if (backups) backups.classList.toggle('hidden', tab !== 'backups');
             if (reports) reports.classList.toggle('hidden', tab !== 'reports');
+            if (activity) activity.classList.toggle('hidden', tab !== 'activity');
             if (users) users.classList.toggle('hidden', tab !== 'users');
 
             if (title) {
-                if (tab === 'backups') title.textContent = 'Database Backups';
-                else if (tab === 'reports') title.textContent = 'Reports & Exports';
+                if (tab === 'reports') title.textContent = 'Reports & Exports';
+                else if (tab === 'activity') title.textContent = 'Activity Monitor';
                 else if (tab === 'users') title.textContent = 'User Management';
                 else title.textContent = 'Admin Dashboard';
             }
             if (subtitle) {
-                if (tab === 'backups') subtitle.textContent = 'Create, download, restore, and manage system backup archives.';
-                else if (tab === 'reports') subtitle.textContent = 'Export system reports and logs.';
+                if (tab === 'reports') subtitle.textContent = 'Export system reports and logs.';
+                else if (tab === 'activity') subtitle.textContent = 'Search and filter staff activity across the dashboards.';
                 else if (tab === 'users') subtitle.textContent = 'Manage Registrar and Security Guard accounts. Admin and Super Admin accounts are managed in the Super Admin dashboard.';
                 else subtitle.textContent = 'System administration and staff account overview.';
             }
@@ -696,16 +499,16 @@
                 link.classList.toggle('bg-green-700', active);
             });
 
-            if (tab === 'backups') history.replaceState(null, '', '#backups');
-            else if (tab === 'reports') history.replaceState(null, '', '#reports');
+            if (tab === 'reports') history.replaceState(null, '', '#reports');
+            else if (tab === 'activity') history.replaceState(null, '', '#activity');
             else if (tab === 'users') history.replaceState(null, '', '#users');
             else history.replaceState(null, '', window.location.pathname + window.location.search);
         }
 
         function syncAdminTabFromHash() {
             const h = window.location.hash;
-            if (h === '#backups') setAdminTab('backups');
-            else if (h === '#reports') setAdminTab('reports');
+            if (h === '#reports') setAdminTab('reports');
+            else if (h === '#activity') setAdminTab('activity');
             else if (h === '#users') setAdminTab('users');
             else setAdminTab('overview');
         }
@@ -715,11 +518,11 @@
                 if (!document.getElementById('admin-tab-overview')) return;
 
                 const tab = link.getAttribute('data-admin-tab');
-                if (tab !== 'overview' && tab !== 'backups' && tab !== 'reports' && tab !== 'users') return;
+                if (tab !== 'overview' && tab !== 'reports' && tab !== 'activity' && tab !== 'users') return;
 
                 event.preventDefault();
-                if (tab === 'backups') history.pushState(null, '', '#backups');
-                else if (tab === 'reports') history.pushState(null, '', '#reports');
+                if (tab === 'reports') history.pushState(null, '', '#reports');
+                else if (tab === 'activity') history.pushState(null, '', '#activity');
                 else if (tab === 'users') history.pushState(null, '', '#users');
                 else history.pushState(null, '', window.location.pathname + window.location.search);
                 setAdminTab(tab);

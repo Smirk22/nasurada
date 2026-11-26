@@ -23,7 +23,7 @@ class VisitorLifecycleTest extends TestCase
         $this->actingAs($user)
             ->get('/Security/dashboard')
             ->assertOk()
-            ->assertSee("Visitor's List", false)
+            ->assertSee('Temporary Pass List', false)
             ->assertDontSee('Pass Valid For');
     }
 

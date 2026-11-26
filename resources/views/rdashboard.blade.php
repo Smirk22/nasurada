@@ -160,8 +160,9 @@
                     </div>
                 @endif
 
-                <!-- Key Metrics -->
-                <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <section id="registrar-tab-overview" class="space-y-6">
+                    <!-- Key Metrics -->
+                    <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div class="page-card stat-card p-5">
                         <div class="flex items-start justify-between gap-3">
                             <div>
@@ -376,11 +377,143 @@
 
                     </div>
                 </section>
+                </section>
+
+                <section id="registrar-tab-export" class="hidden space-y-6">
+                    <div class="page-card p-6">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-900">Export Records</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Download student records for offline use.</p>
+                            </div>
+                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                {{ $totalStudents }} total record{{ $totalStudents === 1 ? '' : 's' }}
+                            </span>
+                        </div>
+
+                        <div class="mt-6 rounded-xl border border-slate-200 bg-white p-4">
+                            <label for="export_section" class="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                                Filter by section
+                            </label>
+                            <div class="mt-2 flex flex-wrap items-center gap-3">
+                                <select id="export_section" name="section" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-ieti-green focus:ring-ieti-green">
+                                    <option value="All Sections">All Sections</option>
+                                    @foreach($sections as $section)
+                                        <option value="{{ $section }}">{{ $section }}</option>
+                                    @endforeach
+                                </select>
+                                <p id="export_scope_note" class="text-xs text-slate-500">Exports the full student list.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Format</p>
+                                <p class="mt-1 text-sm font-bold text-slate-800">Excel (.xls)</p>
+                                <p class="text-[11px] text-slate-400 mt-1">Opens in Excel and spreadsheet apps</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Scope</p>
+                                <p id="export_scope_title" class="mt-1 text-sm font-bold text-slate-800">All student records</p>
+                                <p id="export_scope_detail" class="text-[11px] text-slate-400 mt-1">Exports the full student list</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Photos</p>
+                                <p class="mt-1 text-sm font-bold text-slate-800">Path included</p>
+                                <p class="text-[11px] text-slate-400 mt-1">Image files are not embedded</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex flex-wrap items-center gap-3">
+                            <a id="download_student_records" href="{{ route('registrar.students.export') }}" data-export-base-url="{{ route('registrar.students.export') }}"
+                               class="inline-flex items-center gap-2 rounded-lg bg-ieti-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-800 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path>
+                                </svg>
+                                Download Student Records
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                        The export includes student number, name, course, year and section, phone number, RFID tag, status, school year, enrollment confirmation, card type, validity date, photo path, and timestamps.
+                    </div>
+                </section>
             </main>
         </div>
     </div>
 
     <script>
+        const registrarTabLinks = document.querySelectorAll('.registrar-tab-link');
+        const registrarSections = {
+            overview: document.getElementById('registrar-tab-overview'),
+            export: document.getElementById('registrar-tab-export')
+        };
+
+        function registrarSectionFromHash() {
+            return window.location.hash === '#export-records' ? 'export' : 'overview';
+        }
+
+        function setRegistrarSection(section, updateHash = true) {
+            Object.entries(registrarSections).forEach(([key, element]) => {
+                if (element) element.classList.toggle('hidden', key !== section);
+            });
+
+            registrarTabLinks.forEach((link) => {
+                link.classList.toggle('bg-green-700', link.dataset.registrarTabLink === section);
+            });
+
+            if (updateHash) {
+                history.replaceState(null, '', section === 'export' ? '#export-records' : window.location.pathname + window.location.search);
+            }
+        }
+
+        registrarTabLinks.forEach((link) => {
+            link.addEventListener('click', (event) => {
+                if (!document.getElementById('registrar-tab-overview')) return;
+
+                const section = link.dataset.registrarTabLink;
+                if (section !== 'overview' && section !== 'export') return;
+
+                event.preventDefault();
+                history.pushState(null, '', section === 'export' ? '#export-records' : window.location.pathname + window.location.search);
+                setRegistrarSection(section, false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        window.addEventListener('hashchange', () => setRegistrarSection(registrarSectionFromHash(), false));
+        setRegistrarSection(registrarSectionFromHash(), false);
+
+        const exportSectionSelect = document.getElementById('export_section');
+        const downloadStudentRecords = document.getElementById('download_student_records');
+        const exportScopeTitle = document.getElementById('export_scope_title');
+        const exportScopeDetail = document.getElementById('export_scope_detail');
+        const exportScopeNote = document.getElementById('export_scope_note');
+
+        function updateExportSectionFilter() {
+            if (!exportSectionSelect || !downloadStudentRecords) return;
+
+            const section = exportSectionSelect.value;
+            const url = new URL(downloadStudentRecords.dataset.exportBaseUrl, window.location.origin);
+
+            if (section && section !== 'All Sections') {
+                url.searchParams.set('section', section);
+            }
+
+            downloadStudentRecords.href = url.pathname + url.search;
+
+            const isAllSections = section === 'All Sections';
+            if (exportScopeTitle) exportScopeTitle.textContent = isAllSections ? 'All student records' : 'Section '.concat(section);
+            if (exportScopeDetail) exportScopeDetail.textContent = isAllSections ? 'Exports the full student list' : 'Exports only this section';
+            if (exportScopeNote) exportScopeNote.textContent = isAllSections
+                ? 'Exports the full student list.'
+                : 'Only students in '.concat(section, ' will be downloaded.');
+        }
+
+        exportSectionSelect?.addEventListener('change', updateExportSectionFilter);
+        updateExportSectionFilter();
+
         const entriesTodayCount = document.getElementById('entries-today-count');
 
         async function refreshEntriesToday() {

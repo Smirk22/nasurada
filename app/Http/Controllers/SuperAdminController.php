@@ -26,7 +26,7 @@ class SuperAdminController extends Controller
     {
         $users = User::query()->orderBy('role')->orderBy('name')->get();
 
-        $activityQuery = ActivityLog::query();
+        $activityQuery = ActivityLog::withoutAccessActions();
 
         if ($search = trim((string) $request->input('q', ''))) {
             $activityQuery->where(function ($query) use ($search) {
@@ -40,7 +40,8 @@ class SuperAdminController extends Controller
             $activityQuery->where('role', $role);
         }
 
-        $activities = $activityQuery->latest()->paginate(15)->withQueryString();
+        // Keep the tab anchor and the active filters when moving between pages.
+        $activities = $activityQuery->latest()->paginate(10)->withQueryString()->fragment('activity');
 
         $stats = [
             'accounts' => User::count(),
@@ -81,6 +82,15 @@ class SuperAdminController extends Controller
             $backupStatus = $lastBackup['created_at']->diffInHours(now()) <= 36 ? 'fresh' : 'stale';
         }
 
+        $backupHistory = ActivityLog::backupHistory()
+            ->latest()
+            ->limit(20)
+            ->get();
+        $accessLogs = ActivityLog::accessHistory()
+            ->latest()
+            ->limit(20)
+            ->get();
+
         $settings = [
             'site_name' => (string) Setting::value('site_name', config('app.name')),
             'backup_keep' => (int) Setting::value('backup_keep', config('backup.keep', 14)),
@@ -100,6 +110,8 @@ class SuperAdminController extends Controller
             'backupTotalSize',
             'backupDirectory',
             'backupStatus',
+            'backupHistory',
+            'accessLogs',
             'settings',
         ));
     }
