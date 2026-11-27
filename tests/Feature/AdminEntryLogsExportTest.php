@@ -194,15 +194,26 @@ class AdminEntryLogsExportTest extends TestCase
         $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
         $rows = array_map(fn (string $line) => str_getcsv($line), $lines);
 
-        $this->assertSame(['Section', 'Metric', 'Value'], $rows[0]);
-        $this->assertContains(['Accounts', 'Total Users', '1'], $rows);
-        $this->assertContains(['Students', 'Total Students', '2'], $rows);
-        $this->assertContains(['Students', 'With Registered RFID', '0'], $rows);
-        $this->assertContains(['Students', 'Without Registered RFID', '2'], $rows);
-        $this->assertContains(['Scans', 'Valid Scans (all time)', '2'], $rows);
-        $this->assertContains(['Scans', 'Invalid Scans (all time)', '1'], $rows);
-        $this->assertContains(['Scans', 'Invalid Scans Today', '0'], $rows);
-        $this->assertContains(['Today Status', 'Denied', '0'], $rows);
+        $this->assertSame(['IETI SEVS - SUMMARY REPORT'], $rows[0]);
+        $this->assertSame('Generated At', $rows[1][0]);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $rows[1][1]);
+        $this->assertContains(['Account Summary'], $rows);
+        $this->assertContains(['Account Type', 'Count'], $rows);
+        $this->assertContains(['Total Users', '1'], $rows);
+        $this->assertContains(['Student RFID Registration'], $rows);
+        $this->assertContains(['Metric', 'Students'], $rows);
+        $this->assertContains(['Total Students', '2'], $rows);
+        $this->assertContains(['With Registered RFID', '0'], $rows);
+        $this->assertContains(['Without Registered RFID', '2'], $rows);
+        $this->assertContains(['Scan Summary (All Time)'], $rows);
+        $this->assertContains(['Valid Scans (Granted)', '2'], $rows);
+        $this->assertContains(['Invalid Scans (Denied, Unknown or Expired)', '1'], $rows);
+        $this->assertContains(['Date', 'Granted Scans'], $rows);
+        $this->assertContains(['Status', 'Scans'], $rows);
+        $this->assertContains(['Granted', '0'], $rows);
+        $this->assertContains(['Denied', '0'], $rows);
+        $this->assertContains(['Total Scans', '0'], $rows);
+        $this->assertContains(['Invalid Scans (Denied, Unknown or Expired)', '0'], $rows);
     }
 
     public function test_summary_report_is_recorded_in_the_activity_monitor(): void

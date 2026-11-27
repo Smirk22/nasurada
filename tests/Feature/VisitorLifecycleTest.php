@@ -111,4 +111,130 @@ class VisitorLifecycleTest extends TestCase
         $this->assertNull($visitor->removed_at);
         $this->assertSame(1, Visitor::count());
     }
+
+    public function test_guard_cannot_register_the_same_credentials_twice_with_a_different_rfid_tag(): void
+    {
+        $guard = User::create([
+            'username' => 'guard-duplicate',
+            'email' => 'guard-duplicate@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'Security',
+        ]);
+
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Juan Cruz',
+                'id_type' => 'registration_card',
+                'id_number' => '2026-00123',
+                'visiting_department' => 'loss_of_rfid_id',
+                'rfid_tag' => 'PASS-ONE',
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Juan Cruz',
+                'id_type' => 'registration_card',
+                'id_number' => '2026-00123',
+                'visiting_department' => 'loss_of_rfid_id',
+                'rfid_tag' => 'PASS-TWO',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('visitor_name');
+
+        $this->assertSame(1, Visitor::count());
+        $this->assertDatabaseMissing('visitors', ['rfid_tag' => 'PASS-TWO']);
+    }
+
+    public function test_name_variations_and_id_numbers_are_treated_as_duplicate_credentials(): void
+    {
+        $guard = User::create([
+            'username' => 'guard-duplicate-variants',
+            'email' => 'guard-duplicate-variants@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'Security',
+        ]);
+
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Maria Santos',
+                'id_type' => 'passport',
+                'id_number' => 'P1234567',
+                'visiting_department' => 'registrar',
+                'rfid_tag' => 'MARIA-1',
+            ])
+            ->assertRedirect();
+
+        // Different ID, same name after normalization.
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => '  maria   santos  ',
+                'id_type' => 'passport',
+                'id_number' => 'P9999999',
+                'visiting_department' => 'registrar',
+                'rfid_tag' => 'MARIA-2',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('visitor_name');
+
+        // Different name, same ID type and number.
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Someone Else',
+                'id_type' => 'passport',
+                'id_number' => 'p1234567',
+                'visiting_department' => 'registrar',
+                'rfid_tag' => 'MARIA-3',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors('visitor_name');
+
+        $this->assertSame(1, Visitor::count());
+    }
+
+    public function test_credentials_can_be_reused_after_the_pass_is_removed(): void
+    {
+        $guard = User::create([
+            'username' => 'guard-reuse',
+            'email' => 'guard-reuse@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'Security',
+        ]);
+
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Juan Cruz',
+                'id_type' => 'registration_card',
+                'id_number' => '2026-00123',
+                'visiting_department' => 'loss_of_rfid_id',
+                'rfid_tag' => 'OLD-TAG',
+            ])
+            ->assertRedirect();
+
+        $visitor = Visitor::firstOrFail();
+
+        $this->actingAs($guard)
+            ->delete("/Security/visitors/{$visitor->id}")
+            ->assertRedirect();
+
+        $this->actingAs($guard)
+            ->post('/Security/temporary-pass', [
+                'visitor_name' => 'Juan Cruz',
+                'id_type' => 'registration_card',
+                'id_number' => '2026-00123',
+                'visiting_department' => 'loss_of_rfid_id',
+                'rfid_tag' => 'NEW-TAG',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        // The removed pass stays in history; a fresh active pass is created.
+        $this->assertSame(2, Visitor::count());
+        $this->assertNotNull($visitor->fresh()->removed_at);
+        $this->assertDatabaseHas('visitors', [
+            'rfid_tag' => 'NEW-TAG',
+            'visitor_name' => 'Juan Cruz',
+            'removed_at' => null,
+        ]);
+    }
 }

@@ -142,7 +142,7 @@
                 <div class="bg-white rounded-2xl p-5 shadow border border-gray-100 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 class="text-lg font-bold text-gray-800">Summary Report</h2>
-                        <p class="text-xs text-gray-500 mt-1">Download account, student, RFID, and scan totals with the last 7 days of granted entries.</p>
+                        <p class="text-xs text-gray-500 mt-1">Download an Excel-friendly CSV with clearly grouped account, student, RFID, and scan totals, plus the last 7 days of granted entries.</p>
                     </div>
                     <form method="GET" action="{{ route('admin.reports.summary.export') }}">
                         <button type="submit" class="px-4 py-2 bg-ieti-green text-white rounded-lg text-sm font-semibold hover:opacity-90">Export Reports (CSV)</button>

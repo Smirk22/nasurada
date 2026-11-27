@@ -270,6 +270,7 @@ class AdminController extends Controller
     public function exportSummaryReport(): StreamedResponse
     {
         $generatedAt = now();
+        $totalStudents = Student::count();
         $studentsWithRfid = Student::whereNotNull('rfid_tag')
             ->where('rfid_tag', '!=', '')
             ->count();
@@ -280,36 +281,59 @@ class AdminController extends Controller
             'expired' => EntryLog::whereDate('date', today())->where('status', 'expired')->count(),
         ];
 
+        // Each section gets its own title and column headings so the file is
+        // readable when opened directly in Excel.
         $rows = [
-            ['Report', 'Generated At', $generatedAt->format('Y-m-d H:i:s')],
-            ['Accounts', 'Total Users', User::count()],
-            ['Accounts', 'Admin Accounts', User::where('role', 'Admin')->count()],
-            ['Accounts', 'Registrar Accounts', User::where('role', 'Registrar')->count()],
-            ['Accounts', 'Security Accounts', User::where('role', 'Security')->count()],
-            ['Students', 'Total Students', Student::count()],
-            ['Students', 'With Registered RFID', $studentsWithRfid],
-            ['Students', 'Without Registered RFID', Student::count() - $studentsWithRfid],
-            ['Scans', 'Valid Scans (all time)', EntryLog::where('status', 'granted')->count()],
-            ['Scans', 'Invalid Scans (all time)', EntryLog::whereIn('status', ['denied', 'unknown', 'expired'])->count()],
-            ['Scans', 'Invalid Scans Today', array_sum($todayStatusCounts) - $todayStatusCounts['granted']],
+            ['Generated At', $generatedAt->format('Y-m-d H:i:s')],
+            [],
+            ['Account Summary'],
+            ['Account Type', 'Count'],
+            ['Total Users', User::count()],
+            ['Admin Accounts', User::where('role', 'Admin')->count()],
+            ['Registrar Accounts', User::where('role', 'Registrar')->count()],
+            ['Security Accounts', User::where('role', 'Security')->count()],
+            [],
+            ['Student RFID Registration'],
+            ['Metric', 'Students'],
+            ['Total Students', $totalStudents],
+            ['With Registered RFID', $studentsWithRfid],
+            ['Without Registered RFID', $totalStudents - $studentsWithRfid],
+            [],
+            ['Scan Summary (All Time)'],
+            ['Metric', 'Scans'],
+            ['Valid Scans (Granted)', EntryLog::where('status', 'granted')->count()],
+            ['Invalid Scans (Denied, Unknown or Expired)', EntryLog::whereIn('status', ['denied', 'unknown', 'expired'])->count()],
+            ['Note', 'Valid scans are Granted; invalid scans are Denied, Unknown or Expired.'],
+            [],
         ];
+
+        $firstDay = $generatedAt->copy()->subDays(6);
+        $lastDay = $generatedAt->copy();
+        $rows[] = ['Granted Scans - Last 7 Days ('.$firstDay->format('M d').' - '.$lastDay->format('M d, Y').')'];
+        $rows[] = ['Date', 'Granted Scans'];
 
         for ($i = 6; $i >= 0; $i--) {
             $date = $generatedAt->copy()->subDays($i);
             $rows[] = [
-                'Last 7 Days',
                 $date->format('M d'),
                 EntryLog::whereDate('date', $date->toDateString())->where('status', 'granted')->count(),
             ];
         }
 
+        $rows[] = [];
+        $rows[] = ["Today's Scan Status (".$generatedAt->format('M d, Y').')'];
+        $rows[] = ['Status', 'Scans'];
+
         foreach ($todayStatusCounts as $status => $count) {
-            $rows[] = ['Today Status', ucfirst($status), $count];
+            $rows[] = [ucfirst($status), $count];
         }
+
+        $rows[] = ['Total Scans', array_sum($todayStatusCounts)];
+        $rows[] = ['Invalid Scans (Denied, Unknown or Expired)', array_sum($todayStatusCounts) - $todayStatusCounts['granted']];
 
         return $this->streamCsv(
             'summary_report_'.$generatedAt->format('Ymd_His').'.csv',
-            ['Section', 'Metric', 'Value'],
+            ['IETI SEVS - SUMMARY REPORT'],
             $rows,
             'Exported Summary Report',
             'Downloaded the admin summary report as a CSV file.'

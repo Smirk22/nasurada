@@ -248,6 +248,29 @@ class GuardController extends Controller
             ]);
         }
 
+        // A pass is identified by the person's credentials, not just the tag.
+        // Without this check the same student could be registered twice using
+        // two different RFID tags (or by typing a tag instead of scanning it).
+        $nameKey = Visitor::normalizeName($validated['visitor_name']);
+        $idKey = Visitor::normalizeIdNumber($validated['id_number']);
+
+        $duplicate = Visitor::active()
+            ->when($visitor, fn ($query) => $query->whereKeyNot($visitor->id))
+            ->get(['id', 'visitor_name', 'id_type', 'id_number'])
+            ->first(function (Visitor $existing) use ($nameKey, $idKey, $validated): bool {
+                $sameName = Visitor::normalizeName($existing->visitor_name) === $nameKey;
+                $sameId = $existing->id_type === $validated['id_type']
+                    && Visitor::normalizeIdNumber($existing->id_number) === $idKey;
+
+                return $sameName || $sameId;
+            });
+
+        if ($duplicate) {
+            return redirect()->back()->withInput()->withErrors([
+                'visitor_name' => 'This student already has an active temporary pass (same name or ID number). Remove that pass before issuing a new one.',
+            ]);
+        }
+
         $data = [
             'visitor_name' => $validated['visitor_name'],
             'id_type' => $validated['id_type'],
