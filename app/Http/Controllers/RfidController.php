@@ -31,9 +31,23 @@ class RfidController extends Controller
     {
         $request->validate([
             'uid' => 'required|string|max:32',
+            // Devices with their own GSM modem send "gsm" so Laravel hands back
+            // the recipient/message instead of calling the UniSMS API itself.
+            'sms_channel' => 'sometimes|string|in:api,gsm',
+            // Lets a device retry the same tap over Ethernet without logging it twice.
+            'scan_id' => 'sometimes|string|max:64',
         ]);
 
         $uid = strtoupper(preg_replace('/\s+/', '', $request->uid));
+        $smsChannel = $request->input('sms_channel', 'api');
+
+        if ($request->filled('scan_id')) {
+            $cached = $this->cachedScanResponse($request);
+
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
 
         $student = Student::whereRaw("UPPER(REPLACE(rfid_tag, ' ', '')) = ?", [$uid])->first();
 
@@ -43,7 +57,10 @@ class RfidController extends Controller
         $registrationContext = $this->registrationContextActive();
 
         if ($registrationContext !== null) {
-            return $this->captureRegistrationScan($registrationContext, $uid, $student);
+            return $this->rememberScanResponse(
+                $request,
+                $this->captureRegistrationScan($registrationContext, $uid, $student)
+            );
         }
 
         $now = now();
@@ -88,27 +105,28 @@ class RfidController extends Controller
                     $action = 'time_in';
                 }
 
-                return response()->json([
+                return $this->rememberScanResponse($request, response()->json([
                     'status' => 'success',
                     'action' => $action,
                     'student' => $visitor->visitor_name,
                     'visitor' => true,
-                ]);
+                    'beep' => false,
+                ]));
             }
 
-            return $this->reject($uid, 'unknown_card', 'Unregistered RFID tag detected', 404, $now, $today, null, 'unknown');
+            return $this->rememberScanResponse($request, $this->reject($uid, 'unknown_card', 'Unregistered RFID tag detected', 404, $now, $today, null, 'unknown'));
         }
 
         if ($student->status !== 'Enrolled') {
-            return $this->reject($uid, 'enrollment_not_confirmed', 'Student is not enrolled for the current school year', 403, $now, $today, $student, 'denied');
+            return $this->rememberScanResponse($request, $this->reject($uid, 'enrollment_not_confirmed', 'Student is not enrolled for the current school year', 403, $now, $today, $student, 'denied'));
         }
 
         if (! $student->enrollment_confirmed || $student->school_year !== Student::currentSchoolYear()) {
-            return $this->reject($uid, 'enrollment_not_confirmed', 'Enrollment is not confirmed for the current school year', 403, $now, $today, $student, 'denied');
+            return $this->rememberScanResponse($request, $this->reject($uid, 'enrollment_not_confirmed', 'Enrollment is not confirmed for the current school year', 403, $now, $today, $student, 'denied'));
         }
 
         if ($student->valid_until && Carbon::parse($student->valid_until)->lt(today())) {
-            return $this->reject($uid, 'expired_card', 'This temporary/visitor card has expired', 403, $now, $today, $student, 'expired');
+            return $this->rememberScanResponse($request, $this->reject($uid, 'expired_card', 'This temporary/visitor card has expired', 403, $now, $today, $student, 'expired'));
         }
 
         $todayLog = EntryLog::where('student_id', $student->id)
@@ -142,15 +160,28 @@ class RfidController extends Controller
             $action = 'time_in';
         }
 
+        $sms = null;
+
         if ($action === 'time_in') {
-            $this->uniSms->sendEntryNotification($student);
+            if ($smsChannel === 'gsm') {
+                $sms = $this->uniSms->buildDeviceEntryNotification($student);
+            } else {
+                $this->uniSms->sendEntryNotification($student);
+            }
         }
 
-        return response()->json([
+        $response = [
             'status' => 'success',
             'action' => $action,
             'student' => $student->first_name.' '.$student->last_name,
-        ]);
+            'beep' => false,
+        ];
+
+        if ($smsChannel === 'gsm') {
+            $response['sms'] = $sms;
+        }
+
+        return $this->rememberScanResponse($request, response()->json($response));
     }
 
     public function latest(): JsonResponse
@@ -310,7 +341,42 @@ class RfidController extends Controller
             'owner' => $scan['owner'],
             'nonce' => $scan['nonce'],
             'context' => $context,
+            'beep' => false,
         ]);
+    }
+
+    /**
+     * Replay the original answer when a device retries the same tap (for
+     * example after Wi-Fi drops and the request goes out again over Ethernet).
+     */
+    private function cachedScanResponse(Request $request): ?JsonResponse
+    {
+        $cached = Cache::get($this->scanCacheKey($request));
+
+        if (! is_array($cached) || ! isset($cached['response'], $cached['status'])) {
+            return null;
+        }
+
+        return response()->json($cached['response'], $cached['status']);
+    }
+
+    private function rememberScanResponse(Request $request, JsonResponse $response): JsonResponse
+    {
+        if (! $request->filled('scan_id')) {
+            return $response;
+        }
+
+        Cache::put($this->scanCacheKey($request), [
+            'response' => $response->getData(true),
+            'status' => $response->getStatusCode(),
+        ], now()->addSeconds(60));
+
+        return $response;
+    }
+
+    private function scanCacheKey(Request $request): string
+    {
+        return 'rfid.scan.'.sha1((string) $request->input('scan_id'));
     }
 
     private function reject(
@@ -343,6 +409,7 @@ class RfidController extends Controller
             'uid' => $uid,
             'student' => $name,
             'visitor' => false,
+            'beep' => true,
         ], $httpStatus);
     }
 }

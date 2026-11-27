@@ -435,8 +435,48 @@
                         </div>
                     </div>
 
+                    <div class="page-card p-6">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-900">Export Reports</h2>
+                                <p class="text-xs text-slate-500 mt-0.5">Download a CSV report with grouped student enrollment, section, and RFID totals.</p>
+                            </div>
+                            <span class="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                                {{ $totalStudents }} total record{{ $totalStudents === 1 ? '' : 's' }}
+                            </span>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Format</p>
+                                <p class="mt-1 text-sm font-bold text-slate-800">CSV (.csv)</p>
+                                <p class="text-[11px] text-slate-400 mt-1">Opens in Excel and spreadsheet apps</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Scope</p>
+                                <p id="report_scope_title" class="mt-1 text-sm font-bold text-slate-800">All Sections</p>
+                                <p class="text-[11px] text-slate-400 mt-1">Uses the section filter above</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Contents</p>
+                                <p class="mt-1 text-sm font-bold text-slate-800">Grouped totals</p>
+                                <p class="text-[11px] text-slate-400 mt-1">Enrollment, sections, and RFID</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex flex-wrap items-center gap-3">
+                            <a id="download_student_reports" href="{{ route('registrar.reports.export') }}" data-export-base-url="{{ route('registrar.reports.export') }}"
+                               class="inline-flex items-center gap-2 rounded-lg bg-ieti-green px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-800 transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"></path>
+                                </svg>
+                                Export Reports (CSV)
+                            </a>
+                        </div>
+                    </div>
+
                     <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                        The export includes student number, name, course, year and section, phone number, RFID tag, status, school year, enrollment confirmation, card type, validity date, photo path, and timestamps.
+                        The student records export includes student number, name, course, year and section, phone number, RFID tag, status, school year, enrollment confirmation, card type, validity date, photo path, and timestamps. The reports export includes grouped student totals for the selected section.
                     </div>
                 </section>
             </main>
@@ -487,21 +527,34 @@
 
         const exportSectionSelect = document.getElementById('export_section');
         const downloadStudentRecords = document.getElementById('download_student_records');
+        const downloadStudentReports = document.getElementById('download_student_reports');
         const exportScopeTitle = document.getElementById('export_scope_title');
         const exportScopeDetail = document.getElementById('export_scope_detail');
         const exportScopeNote = document.getElementById('export_scope_note');
+        const reportScopeTitle = document.getElementById('report_scope_title');
 
-        function updateExportSectionFilter() {
-            if (!exportSectionSelect || !downloadStudentRecords) return;
-
-            const section = exportSectionSelect.value;
-            const url = new URL(downloadStudentRecords.dataset.exportBaseUrl, window.location.origin);
+        function exportUrlFor(baseUrl, section) {
+            const url = new URL(baseUrl, window.location.origin);
 
             if (section && section !== 'All Sections') {
                 url.searchParams.set('section', section);
             }
 
-            downloadStudentRecords.href = url.pathname + url.search;
+            return url.pathname + url.search;
+        }
+
+        function updateExportSectionFilter() {
+            if (!exportSectionSelect) return;
+
+            const section = exportSectionSelect.value;
+
+            if (downloadStudentRecords) {
+                downloadStudentRecords.href = exportUrlFor(downloadStudentRecords.dataset.exportBaseUrl, section);
+            }
+
+            if (downloadStudentReports) {
+                downloadStudentReports.href = exportUrlFor(downloadStudentReports.dataset.exportBaseUrl, section);
+            }
 
             const isAllSections = section === 'All Sections';
             if (exportScopeTitle) exportScopeTitle.textContent = isAllSections ? 'All student records' : 'Section '.concat(section);
@@ -509,6 +562,7 @@
             if (exportScopeNote) exportScopeNote.textContent = isAllSections
                 ? 'Exports the full student list.'
                 : 'Only students in '.concat(section, ' will be downloaded.');
+            if (reportScopeTitle) reportScopeTitle.textContent = isAllSections ? 'All Sections' : section;
         }
 
         exportSectionSelect?.addEventListener('change', updateExportSectionFilter);

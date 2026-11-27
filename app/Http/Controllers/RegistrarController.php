@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RegistrarController extends Controller
@@ -200,6 +201,122 @@ class RegistrarController extends Controller
 
             echo '</tbody></table>';
         }, $filename, ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8']);
+    }
+
+    /**
+     * Download a grouped CSV report of the student records, honouring the
+     * same section filter used by the student list and records export.
+     */
+    public function exportReports(Request $request): StreamedResponse
+    {
+        $generatedAt = now();
+        $query = $this->filteredStudents($request);
+
+        $section = $request->input('section');
+        $scope = $section && $section !== 'All Sections' ? (string) $section : 'All Sections';
+
+        $totalStudents = (clone $query)->count();
+        $confirmedStudents = (clone $query)->where('enrollment_confirmed', true)->count();
+        $studentsWithRfid = (clone $query)
+            ->whereNotNull('rfid_tag')
+            ->where('rfid_tag', '!=', '')
+            ->count();
+
+        $statusCounts = (clone $query)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $sectionBreakdown = (clone $query)
+            ->selectRaw('year_level, section, COUNT(*) as total')
+            ->whereNotNull('section')
+            ->where('section', '<>', '')
+            ->groupBy('year_level', 'section')
+            ->orderBy('year_level')
+            ->orderBy('section')
+            ->get();
+
+        $cardTypeCounts = (clone $query)
+            ->selectRaw('card_type, COUNT(*) as total')
+            ->groupBy('card_type')
+            ->pluck('total', 'card_type');
+
+        $rows = [
+            ['Generated At', $generatedAt->format('Y-m-d H:i:s')],
+            ['Scope', $scope],
+            [],
+            ['Enrollment Summary'],
+            ['Metric', 'Students'],
+            ['Total Students', $totalStudents],
+            ['Enrollment Confirmed', $confirmedStudents],
+            ['Enrollment Not Confirmed', $totalStudents - $confirmedStudents],
+        ];
+
+        foreach ($statusCounts as $status => $count) {
+            $rows[] = ['Status: '.($status ?: 'Unspecified'), $count];
+        }
+
+        $rows[] = [];
+        $rows[] = ['Students by Year and Section'];
+        $rows[] = ['Year Level', 'Section', 'Students'];
+
+        foreach ($sectionBreakdown as $breakdown) {
+            $rows[] = [$breakdown->year_level, $breakdown->section, $breakdown->total];
+        }
+
+        $rows[] = [];
+        $rows[] = ['RFID and Access Card Summary'];
+        $rows[] = ['Metric', 'Students'];
+        $rows[] = ['Total Students', $totalStudents];
+        $rows[] = ['With Registered RFID', $studentsWithRfid];
+        $rows[] = ['Without Registered RFID', $totalStudents - $studentsWithRfid];
+
+        foreach ($cardTypeCounts as $cardType => $count) {
+            $rows[] = ['Card Type: '.($cardType ?: 'Unspecified'), $count];
+        }
+
+        return $this->streamCsv(
+            'student_reports_'.$generatedAt->format('Ymd_His').'.csv',
+            ['IETI SEVS - STUDENT REPORTS'],
+            $rows,
+            'Exported Student Reports',
+            "Downloaded the student records report for {$scope} as a CSV file."
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $headers
+     * @param  iterable<array<int, mixed>>  $rows
+     */
+    private function streamCsv(string $filename, array $headers, iterable $rows, string $action, string $details): StreamedResponse
+    {
+        ActivityLog::log($action, $details);
+
+        return response()->streamDownload(function () use ($headers, $rows) {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                throw new RuntimeException('Unable to open the CSV output stream.');
+            }
+
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $headers);
+
+            foreach ($rows as $row) {
+                fputcsv($handle, array_map(fn ($value) => $this->csvValue($value), $row));
+            }
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    private function csvValue(mixed $value): string
+    {
+        $text = (string) ($value ?? '');
+
+        return preg_match('/^\s*[=+\-@]/', $text) ? "'".$text : $text;
     }
 
     /**

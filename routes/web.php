@@ -83,6 +83,7 @@ Route::middleware(['auth', 'role:SuperAdmin,Admin,Registrar'])->group(function (
     Route::get('/rdashboard', [RegistrarController::class, 'dashboard'])->name('rdashboard');
     Route::get('/registrar/students', [RegistrarController::class, 'students'])->name('registrar.students');
     Route::get('/registrar/students/export', [RegistrarController::class, 'exportStudents'])->name('registrar.students.export');
+    Route::get('/registrar/reports/export', [RegistrarController::class, 'exportReports'])->name('registrar.reports.export');
     Route::post('/registrar/students', [RegistrarController::class, 'store'])->name('registrar.students.store');
     Route::put('/registrar/students/{student}', [RegistrarController::class, 'update'])->name('registrar.students.update');
     Route::post('/registrar/students/{student}/photo', [RegistrarController::class, 'updatePhoto'])->name('registrar.students.photo');

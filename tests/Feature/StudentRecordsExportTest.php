@@ -63,7 +63,9 @@ class StudentRecordsExportTest extends TestCase
             ->assertSee('value="S1A1"', false)
             ->assertSee('value="S3B1"', false)
             ->assertSee('value="S7C4"', false)
-            ->assertSee(route('registrar.students.export'), false);
+            ->assertSee(route('registrar.students.export'), false)
+            ->assertSee('Export Reports (CSV)')
+            ->assertSee(route('registrar.reports.export'), false);
     }
 
     public function test_registrar_can_download_student_records(): void
@@ -84,6 +86,76 @@ class StudentRecordsExportTest extends TestCase
         $this->assertStringContainsString('MAR87654321', $content);
         $this->assertStringContainsString('Juan', $content);
         $this->assertStringContainsString('ENG12345678', $content);
+    }
+
+    public function test_registrar_can_download_reports_as_csv(): void
+    {
+        $this->createStudents();
+
+        $response = $this->actingAs($this->registrar())
+            ->get(route('registrar.reports.export'));
+
+        $response->assertOk();
+
+        $disposition = (string) $response->headers->get('content-disposition');
+        $this->assertStringContainsString('student_reports_', $disposition);
+        $this->assertStringContainsString('.csv', $disposition);
+        $this->assertStringContainsString('text/csv', (string) $response->headers->get('content-type'));
+
+        $content = $response->streamedContent();
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+
+        $lines = array_values(array_filter(
+            preg_split('/\r\n|\r|\n/', $content) ?: [],
+            fn (string $line) => trim($line) !== ''
+        ));
+        $lines[0] = preg_replace('/^\xEF\xBB\xBF/', '', $lines[0]);
+        $rows = array_map(fn (string $line) => str_getcsv($line), $lines);
+
+        $this->assertSame(['IETI SEVS - STUDENT REPORTS'], $rows[0]);
+        $this->assertContains(['Scope', 'All Sections'], $rows);
+        $this->assertContains(['Metric', 'Students'], $rows);
+        $this->assertContains(['Total Students', '2'], $rows);
+        $this->assertContains(['Enrollment Confirmed', '0'], $rows);
+        $this->assertContains(['Enrollment Not Confirmed', '2'], $rows);
+        $this->assertContains(['Status: Enrolled', '2'], $rows);
+        $this->assertContains(['Students by Year and Section'], $rows);
+        $this->assertContains(['Year Level', 'Section', 'Students'], $rows);
+        $this->assertContains(['1', 'S1A1', '1'], $rows);
+        $this->assertContains(['2', 'S3B1', '1'], $rows);
+        $this->assertContains(['RFID and Access Card Summary'], $rows);
+        $this->assertContains(['With Registered RFID', '1'], $rows);
+        $this->assertContains(['Without Registered RFID', '1'], $rows);
+        $this->assertContains(['Card Type: student', '2'], $rows);
+    }
+
+    public function test_report_honors_section_filter(): void
+    {
+        $this->createStudents();
+
+        $content = $this->actingAs($this->registrar())
+            ->get(route('registrar.reports.export', ['section' => 'S1A1']))
+            ->streamedContent();
+
+        $this->assertStringContainsString('Scope,S1A1', $content);
+        $this->assertStringContainsString('"Total Students",1', $content);
+        $this->assertStringContainsString('1,S1A1,1', $content);
+        $this->assertStringNotContainsString('S3B1', $content);
+    }
+
+    public function test_report_export_is_recorded_in_the_activity_monitor(): void
+    {
+        $this->createStudents();
+
+        $this->actingAs($this->registrar())
+            ->get(route('registrar.reports.export'))
+            ->assertOk();
+
+        $this->assertDatabaseHas('activity_logs', [
+            'user_name' => 'registrar-export',
+            'role' => 'Registrar',
+            'action' => 'Exported Student Reports',
+        ]);
     }
 
     public function test_export_honors_student_list_filters(): void
@@ -121,6 +193,20 @@ class StudentRecordsExportTest extends TestCase
 
         $this->actingAs($guard)
             ->get(route('registrar.students.export'))
+            ->assertRedirect(route('guard.dashboard'));
+    }
+
+    public function test_security_cannot_export_reports(): void
+    {
+        $guard = User::create([
+            'username' => 'guard-report-export',
+            'email' => 'guard-report-export@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'Security',
+        ]);
+
+        $this->actingAs($guard)
+            ->get(route('registrar.reports.export'))
             ->assertRedirect(route('guard.dashboard'));
     }
 }

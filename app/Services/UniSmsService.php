@@ -91,6 +91,34 @@ class UniSmsService
     }
 
     /**
+     * Build the SMS payload a gate controller should send through its own GSM
+     * modem. No API key is needed because the Arduino does the actual sending.
+     *
+     * @return array{student_id: int, phone: string, message: string}|null
+     */
+    public function buildDeviceEntryNotification(Student $student): ?array
+    {
+        $recipient = $this->normalizeRecipient((string) $student->phone_number);
+
+        if ($recipient === '') {
+            return null;
+        }
+
+        $now = now();
+
+        return [
+            'student_id' => $student->id,
+            'phone' => $recipient,
+            'message' => sprintf(
+                'Hi %s, your RFID was scanned at %s on %s. Entry granted.',
+                $student->first_name,
+                $now->format('g:i A'),
+                $now->format('F j, Y')
+            ),
+        ];
+    }
+
+    /**
      * Convert a stored number to the +63 international format the API prefers.
      */
     private function normalizeRecipient(string $number): string
